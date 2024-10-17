@@ -292,5 +292,13 @@ if __name__ == "__main__":
             compressed_dim=COMPRESSED_DIM,
             device='cuda'
         )
-        combined_model.mteb_eval("NFCorpus")
+        # combined_model.mteb_eval("NFCorpus")
+        
+    e5_path_embeddings =  "../data/e5_wiki_500k/train_embeddings.npy"
+    mxbai_path_embeddings =  "../data/mxbai_wiki_500k/train_embeddings.npy"
+    
+    emb_paths [e5_path_embeddings, mxbai_path_embeddings]
+    
+     
+        
 

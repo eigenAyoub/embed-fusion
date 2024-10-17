@@ -66,9 +66,7 @@ def train():
     train_loader, val_loader = get_data_loaders()
 
     # Initialize the model
-    print("must be here", INPUT_DIM, COMPRESSED_DIM)
     model = AutoEncoder(INPUT_DIM, COMPRESSED_DIM).to(DEVICE)
-    print(model)
     model.apply(initialize_weights)
 
     # loss and optimizer

@@ -49,5 +49,7 @@ MODEL_CATALOGUE = {
             "gte-large"       : "thenlper/gte-large",
             "gte-small"       : "thenlper/gte-small",
             "e5-small"        : "intfloat/e5-small-v2", # (33M)
-            "bge-small"       : "BAAI/bge-small-en-v1.5" # (33M)
+            "bge-small"       : "BAAI/bge-small-en-v1.5", # (33M)
+            "jina-v3"         : "jinaai/jina-embeddings-v3"
 }
+
