@@ -7,3 +7,5 @@ BEST_MODEL_PATH
 *.pkl
 *.bin
 *.png
+**/__pycache__
+poetry.lock

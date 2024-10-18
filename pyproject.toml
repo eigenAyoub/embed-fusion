@@ -1,0 +1,35 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "embed-fusion"
+version = "1.0.0"
+description = "Experiments on concatenating embeddings and reducing their dimensionality."
+authors = [
+    "Ayoub",
+    "Michael"
+]
+homepage = "https://www.fim.uni-passau.de"
+repository = "https://www.fim.uni-passau.de"
+readme = "README.md"
+license = "Apache-2.0"
+packages = [
+    {include = "ef", from = "src"},
+    {include = "auto_encoder", from = "src"}
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+click = "^8.1.7"
+pandas = "^2.2.2"
+tqdm = "^4.66.4"
+transformers = "^4.42.3"
+torch = "^2.3.1"
+# sentence-transformers = "^3.0.1"
+numpy = "^1.26.4"
+datasets = "^2.21.0"
+mteb = "1.14.12"
+
+[tool.poetry.scripts]
+ef = "ef.ef:main"
