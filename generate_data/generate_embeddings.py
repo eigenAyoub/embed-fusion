@@ -59,7 +59,7 @@ model = SentenceTransformer(models[m_name],
 model.eval()
 embeddings = []
 
-batch_size = 128
+batch_size = 512 
 num_batches = (len(all_paragraphs) + batch_size - 1) // batch_size
 
 for i in tqdm(range(num_batches), desc="Generating Embeddings"):

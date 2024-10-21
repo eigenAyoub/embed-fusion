@@ -6,7 +6,11 @@ from config import INPUT_DIM, COMPRESSED_DIM
 
 n_0 = 1792 
 n_1 = 1280
-n_2 = 1024
+#n_2 = 1024
+
+
+n_0 = 1792 
+n_1 = 1024 
 
 class AutoEncoder(nn.Module):
     def __init__(self, input_dim=1, compressed_dim=1):

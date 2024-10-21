@@ -12,48 +12,46 @@ import os
 from model import AutoEncoder 
 from config import MODEL_CATALOGUE # {model_name: model_hugging_face_id}
 
+
 class MappingNet(nn.Module):
     def __init__(self):
         super(MappingNet, self).__init__()
-        self.layers = nn.Sequential(
-            nn.Linear(768, 1024),
-            nn.ReLU(),
-            nn.Dropout(p=0.3),
-            nn.Linear(1024, 512),
-            nn.ReLU(),
-            nn.Dropout(p=0.3),
-            nn.Linear(512, 256),
-            nn.ReLU(),
-            nn.Dropout(p=0.3),
-            nn.Linear(256, 512),
-            nn.ReLU(),
-            nn.Dropout(p=0.3),
-            nn.Linear(512, 1024),
-            nn.ReLU(),
-            nn.Dropout(p=0.3),
-            nn.Linear(1024, 768)
+
+        self.layer_2048= nn.Sequential(
+            nn.Linear(768, 2048),
+            nn.BatchNorm1d(2048),
+            nn.LeakyReLU(0.2, inplace=True)
         )
 
+        self.layer_2048_768 = nn.Sequential(
+            nn.Linear(2048, 768),
+            nn.BatchNorm1d(768),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        
+        self.layer_768_2048 = nn.Sequential(
+            nn.Linear(768, 2048),
+            nn.BatchNorm1d(2048),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        
+#        self.final_layer = nn.Linear(1024, 768)
+        
+        self._initialize_weights()
+                
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.zeros_(m.bias)
+                
     def forward(self, x):
-        return self.layers(x)
+        out0 = self.layer_2048(x)                        # 1024 dim
+        out1 = self.layer_2048_768(out0) + x       # 2048 dim
+        out2 = self.layer_768_2048(out1)              # 1024 dim
+#        final_out = self.final_layer(out2) + x             # 768 dim
+        return out2, out0, out1
 
-
-big   = ("e5", "mxbai")
-small = ("e5-small", "bge-small")
-
-nm1, nm2 = small 
-model_names = [MODEL_CATALOGUE[nm1], MODEL_CATALOGUE[nm2]]
-main_models = [SentenceTransformer(nm).to("cuda") for nm in model_names]
-
-INPUT_DIM       = int(sys.argv[1])
-COMPRESSED_DIM  = int(sys.argv[2])
-
-CHECKPOINT_PATH = None 
-
-if len(sys.argv) > 3:
-    CHECKPOINT_PATH = sys.argv[3]
-
-import torch.nn as nn
 
 class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
     def __init__(
@@ -221,7 +219,7 @@ class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
         elif apply_mapper and self.mapper:
             with torch.no_grad():
                 compressed_embeddings = self.mapper(combined_tensor)
-            embeddings_to_return = compressed_embeddings
+            embeddings_to_return = compressed_embeddings[2]
         else:
             embeddings_to_return = combined_tensor 
 
@@ -287,79 +285,29 @@ class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
             self.autoencoder.to(device)
 
 
-autoencoder_path_ = None
-if CHECKPOINT_PATH is not None:
-    autoencoder_path_ = f'models_pth/{INPUT_DIM}_{COMPRESSED_DIM}/{CHECKPOINT_PATH}'
-
-"""
-repo_url = "https://huggingface.co/benayad7/concat-e5-small-bge-small-01"
-
-combined_model = CombinedSentenceTransformer(
-    models=main_models,
-    autoencoder_path=autoencoder_path_,  
-    input_dim= INPUT_DIM,  
-    compressed_dim= COMPRESSED_DIM,
-    device='cuda' if torch.cuda.is_available() else 'cpu',
-    #repo_url=repo_url,
-    #pipeline_tag="text-embedding",
-    #license="mit",
-)
-
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-combined_model.to(device)
-
-
-
-    # Repeat the process for the validation set
-    e5_val_embeddings_path = "data/e5_wiki_500k/val_embeddings.npy"
-    mxbai_val_embeddings_path = "data/mxbai_wiki_500k/val_embeddings.npy"
-    output_val_embeddings_path = "data/combined_embeddings/val_embeddings.npy"
-
-    combined_model.generate_embeddings(
-        embeddings_paths=[e5_val_embeddings_path, mxbai_val_embeddings_path],
-        output_path=output_val_embeddings_path,
-        batch_size=512
-    )
-
-    print("Combined embeddings have been generated and saved.")
-
-    e5_train_embeddings_path    = "../data/e5_wiki_500k/train_embeddings.npy"
-    mxbai_train_embeddings_path = "../data/mxbai_wiki_500k/train_embeddings.npy"
-
-    output_train_embeddings_path = "../data/mix_train_embeddings.npy"
-    autoencoder_path = "models_pth/2048_768/013036.pth"
-
-    e5_embeddings_sample    = np.load(e5_train_embeddings_path,    mmap_mode='r')
-    mxbai_embeddings_sample = np.load(mxbai_train_embeddings_path, mmap_mode='r')
-
-    e5_dim = e5_embeddings_sample.shape[1]
-    mxbai_dim = mxbai_embeddings_sample.shape[1]
-
-    INPUT_DIM = e5_dim + mxbai_dim
-    COMPRESSED_DIM = 768 
-
-"""
 
 if __name__ == "__main__":
 
+    big   = ("e5", "mxbai")
+    small = ("e5-small", "bge-small")
+
+    nm1, nm2 = small 
+
+    model_names = [MODEL_CATALOGUE[nm1], MODEL_CATALOGUE[nm2]]
+    main_models = [SentenceTransformer(nm).to("cuda") for nm in model_names]
+
+
+    #CHECKPOINT_PATH = None 
+
+    CHECKPOINT_PATH = sys.argv[1]
 
     combined_model = CombinedSentenceTransformer(
         models=main_models,  
-        mapper_path ="best_model_01.pth",
-#        input_dim=INPUT_DIM,
-#        compressed_dim=COMPRESSED_DIM,
+        mapper_path ="best_model_jj.pth",
         device='cuda' if torch.cuda.is_available() else 'cpu'
     )
-
-    # Generate combined embeddings for the training set
-    #combined_model.generate_embeddings(
-    #    embeddings_paths=[e5_train_embeddings_path, mxbai_train_embeddings_path],
-    #    output_path=output_train_embeddings_path,
-    #    batch_size=512
-    #)
 
     import mteb
     tasks = mteb.get_tasks(tasks=["NFCorpus"]) 
     evaluation = mteb.MTEB(tasks=tasks, eval_splits=["test"], metric="ndcg@10")
-    results = evaluation.run(combined_model, output_folder = f"results/mix_map")
+    results = evaluation.run(combined_model, output_folder = f"results/mix_shit12")

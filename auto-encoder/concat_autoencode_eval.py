@@ -294,10 +294,41 @@ if __name__ == "__main__":
         )
         # combined_model.mteb_eval("NFCorpus")
         
-    e5_path_embeddings =  "../data/e5_wiki_500k/train_embeddings.npy"
-    mxbai_path_embeddings =  "../data/mxbai_wiki_500k/train_embeddings.npy"
+#    e5_path_embeddings    =  "../data/new_e5_wiki_500k/train_embeddings.npy"
+#    mxbai_path_embeddings =  "../data/new_mxbai_wiki_500k/train_embeddings.npy"
     
-    emb_paths [e5_path_embeddings, mxbai_path_embeddings]
+    data_1 =  np.load("../generate_data/embeddings_data/new_e5_wiki_500k/train_embeddings.npy")
+    data_2 =  np.load("../generate_data/embeddings_data/new_mxbai_wiki_500k/train_embeddings.npy")
+
+    data_3 =  np.load("../generate_data/embeddings_data/new_e5_wiki_500k/val_embeddings.npy")
+    data_4 =  np.load("../generate_data/embeddings_data/new_mxbai_wiki_500k/val_embeddings.npy")
+
+    data_train = np.concatenate((data_1, data_2), axis=1)
+    data_val   = np.concatenate((data_3, data_4), axis=1)
+
+    autoencoder = AutoEncoder(input_dim=INPUT_DIM, compressed_dim=COMPRESSED_DIM)
+    autoencoder.load_state_dict(torch.load(autoencoder_path, map_location=device))
+
+    autoencoder_train = autoencoder(data_train)[0]
+    autoencoder_val   = autoencoder(data_train)[0]
+
+    #np.save()
+    #mse = nn.MSELoss() 
+    #print(f"Loss is > ", mse(y, data))
+    #emb_paths [e5_path_embeddings, mxbai_path_embeddings]
+
+
+
+
+
+
+
+
+
+
+
+
+
     
      
         

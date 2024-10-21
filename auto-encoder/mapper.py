@@ -9,70 +9,96 @@ from sklearn.model_selection import train_test_split
 
 # Load the data
 path_1 = "../data/mix_train_embeddings.npy"
-path_2 = "../data/bge-small_wiki_500k/train_embeddings.npy"
-path_3 = "../data/e5-small_wiki_500k/train_embeddings.npy"
 
-data_2 = np.load(path_2)
-data_3 = np.load(path_3)
+path_768 = "mapper_data/autoencoder_train_768.npy"
+path_1024 = "mapper_data/autoencoder_train_1024.npy"
 
-input_data  = np.concatenate((data_2, data_3), axis=1)
-target_data = np.load(path_1)
+path_bge_small = "../generate_data/embeddings_data/new_bge-small_wiki_500k/train_embeddings.npy"
+path_e5_small = "../generate_data/embeddings_data/new_e5-small_wiki_500k/train_embeddings.npy"
 
-# Normalize the data
+path_e5 = "../generate_data/embeddings_data/new_e5_wiki_500k/train_embeddings.npy"
+path_mxbai = "../generate_data/embeddings_data/new_mxbai_wiki_500k/train_embeddings.npy"
 
-scaler_input = StandardScaler()
-input_data = scaler_input.fit_transform(input_data)
+data_2 = np.load(path_bge_small)
+data_3 = np.load(path_e5_small)
 
-scaler_target = StandardScaler()
-target_data = scaler_target.fit_transform(target_data)
+input_data = np.concatenate((data_2, data_3), axis=1)
+
+e5_data = np.load(path_e5)
+mxbai_data = np.load(path_mxbai)
+original_data = np.concatenate((e5_data, mxbai_data), axis=1)
+
+target_768 = np.load(path_768)    # N x 768
+target_1024 = np.load(path_1024)  # N x 1024
+
+# Normalize the data (optional)
+# scaler_input = StandardScaler()
+# input_data = scaler_input.fit_transform(input_data)
+# scaler_target_768 = StandardScaler()
+# target_768 = scaler_target_768.fit_transform(target_768)
+# scaler_target_1024 = StandardScaler()
+# target_1024 = scaler_target_1024.fit_transform(target_1024)
 
 # Convert to tensors
-
 input_tensor = torch.from_numpy(input_data).float()
-target_tensor = torch.from_numpy(target_data).float()
+target_768_tensor = torch.from_numpy(target_768).float()
+target_1024_tensor = torch.from_numpy(target_1024).float()
+original_tensor = torch.from_numpy(original_data).float()
 
 # Split into training and validation sets
-X_train, X_val, y_train, y_val = train_test_split(
-    input_tensor, target_tensor, test_size=0.1, random_state=42
+x_train, x_val, y_train_768, y_val_768, y_train_1024, y_val_1024, original_train, original_val = train_test_split(
+    input_tensor, target_768_tensor, target_1024_tensor, original_tensor, test_size=0.1, random_state=42
 )
 
 # Create DataLoaders
-batch_size = 256
+batch_size = 64
 
-train_dataset = TensorDataset(X_train, y_train)
+train_dataset = TensorDataset(x_train, y_train_768, y_train_1024, original_train)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-val_dataset = TensorDataset(X_val, y_val)
+val_dataset = TensorDataset(x_val, y_val_768, y_val_1024, original_val)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
 
 # Define the model
 class MappingNet(nn.Module):
     def __init__(self):
         super(MappingNet, self).__init__()
-        self.layers = nn.Sequential(
-            nn.Linear(768, 1024),
-            nn.ReLU(),
-            nn.Dropout(p=0.3),
 
-            nn.Linear(1024, 1024),
-            nn.ReLU(),
-            nn.Dropout(p=0.3),
-
-            nn.Linear(1024, 1024),
-            nn.ReLU(),
-            nn.Dropout(p=0.3),
-
-            nn.Linear(1024, 768)
+        self.layer_2048= nn.Sequential(
+            nn.Linear(768, 2048),
+            nn.BatchNorm1d(2048),
+            nn.LeakyReLU(0.2, inplace=True)
         )
 
+        self.layer_2048_768 = nn.Sequential(
+            nn.Linear(2048, 768),
+            nn.BatchNorm1d(768),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        
+        self.layer_768_2048 = nn.Sequential(
+            nn.Linear(768, 2048),
+            nn.BatchNorm1d(2048),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        
+#        self.final_layer = nn.Linear(1024, 768)
+        
+        self._initialize_weights()
+                
     def _initialize_weights(self):
-        for m in self.layers:
+        for m in self.modules():
             if isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight)
                 nn.init.zeros_(m.bias)
-
+                
     def forward(self, x):
-        return self.layers(x)
+        out0 = self.layer_2048(x)                        # 1024 dim
+        out1 = self.layer_2048_768(out0) + x       # 2048 dim
+        out2 = self.layer_768_2048(out1)              # 1024 dim
+#        final_out = self.final_layer(out2) + x             # 768 dim
+        return out2, out0, out1
 
 # Initialize the model
 model = MappingNet()
@@ -82,44 +108,76 @@ model._initialize_weights()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.to(device)
 
-# Loss and optimizer
+# Define loss and optimizer
 criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+optimizer = torch.optim.AdamW(model.parameters(), lr=4e-3)
 
-# Training loop with validation
+# Training loop with validation and early stopping
 num_epochs = 30
 best_val_loss = float('inf')
 patience = 5
 trigger_times = 0
 
+
 for epoch in range(num_epochs):
-    # Training
+    # Training phase
     model.train()
     total_train_loss = 0
-    for batch_inputs, batch_targets in train_loader:
-        batch_inputs = batch_inputs.to(device)
-        batch_targets = batch_targets.to(device)
+    step = 0 
+    for batch_inputs, batch_tar_768, batch_tar_1024, batch_original in train_loader:
+        
+        batch_inputs   = batch_inputs.to(device)
+        batch_tar_768  = batch_tar_768.to(device)
+        batch_tar_1024 = batch_tar_1024.to(device)
+        batch_original = batch_original.to(device)
+
+        step += 1
 
         optimizer.zero_grad()
-        outputs = model(batch_inputs)
-        loss = criterion(outputs, batch_targets)
+
+        out2048, out1024, final_out = model(batch_inputs)
+        
+        #loss1024 = criterion(out1024, batch_tar_1024)  
+        #loss2048 = criterion(out2048, batch_original)  
+        #loss2 = criterion(final_out, batch_tar_768)
+        #loss = loss1024 + loss2048 + loss2
+        loss = criterion(out2048, out1024) + criterion(out2048, batch_original) + criterion(out1024, batch_original)
+
         loss.backward()
         optimizer.step()
 
         total_train_loss += loss.item()
 
+        #if step % 100 == 0:
+        #    avg_loss_so_far = total_train_loss / step
+        #    print(f"Epoch [{epoch+1}/{num_epochs}], Step [{step}], "
+        #          f"Current Batch Loss: {loss.item():.6f}, "
+        #          f"Average Loss So Far: {avg_loss_so_far:.6f}")
+
     avg_train_loss = total_train_loss / len(train_loader)
 
-    # Validation
+    # Validation phase
     model.eval()
     total_val_loss = 0
     with torch.no_grad():
-        for batch_inputs, batch_targets in val_loader:
+        for batch_inputs, batch_tar_768, batch_tar_1024, batch_original in val_loader:
             batch_inputs = batch_inputs.to(device)
-            batch_targets = batch_targets.to(device)
+            batch_tar_768 = batch_tar_768.to(device)
+            batch_tar_1024 = batch_tar_1024.to(device)
+            batch_original = batch_original.to(device)
 
-            outputs = model(batch_inputs)
-            loss = criterion(outputs, batch_targets)
+
+            out2048, out1024, final_out = model(batch_inputs)
+            
+#            loss1024 = criterion(out1024, batch_tar_1024)  
+#            loss2048 = criterion(out2048, batch_original)  
+#            loss2 = criterion(final_out, batch_tar_768)
+#            loss = loss1024 + loss2048 + loss2
+
+
+            loss = criterion(out2048, out1024) + criterion(out2048, batch_original) + criterion(out1024, batch_original)
+
+            
             total_val_loss += loss.item()
 
     avg_val_loss = total_val_loss / len(val_loader)
@@ -133,6 +191,7 @@ for epoch in range(num_epochs):
         best_val_loss = avg_val_loss
         trigger_times = 0
         # Save the best model
+        print("> Model saved!")
         torch.save(model.state_dict(), 'best_model_jj.pth')
     else:
         trigger_times += 1
