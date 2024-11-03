@@ -17,20 +17,32 @@ class MappingNet(nn.Module):
     def __init__(self):
         super(MappingNet, self).__init__()
 
-        self.layer_2048= nn.Sequential(
+        self.layer_768_2048 = nn.Sequential(
             nn.Linear(768, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(0.2, inplace=True)
         )
-
-        self.layer_2048_768 = nn.Sequential(
-            nn.Linear(2048, 768),
+        
+        self.layer_2048_1024 = nn.Sequential(
+            nn.Linear(2048, 1024),
+            nn.BatchNorm1d(1024),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        
+        self.layer_1024_768 = nn.Sequential(
+            nn.Linear(1024, 768),
             nn.BatchNorm1d(768),
             nn.LeakyReLU(0.2, inplace=True)
         )
         
-        self.layer_768_2048 = nn.Sequential(
-            nn.Linear(768, 2048),
+        self.layer_768_1024 = nn.Sequential(
+            nn.Linear(768, 1024),
+            nn.BatchNorm1d(1024),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        
+        self.layer_1024_2048 = nn.Sequential(
+            nn.Linear(1024, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(0.2, inplace=True)
         )
@@ -46,12 +58,12 @@ class MappingNet(nn.Module):
                 nn.init.zeros_(m.bias)
                 
     def forward(self, x):
-        out0 = self.layer_2048(x)                        # 1024 dim
-        out1 = self.layer_2048_768(out0) + x       # 2048 dim
-        out2 = self.layer_768_2048(out1)              # 1024 dim
-#        final_out = self.final_layer(out2) + x             # 768 dim
-        return out2, out0, out1
-
+        out1 = self.layer_768_2048(x)       # 2048
+        out2 = self.layer_2048_1024(out1)   # 1024
+        out3 = self.layer_1024_768(out2)    # 768
+        out4 = self.layer_768_1024(out3)    # 1024
+        out5 = self.layer_1024_2048(out4)   # 2048
+        return out3, out2, out4, out1, out5
 
 class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
     def __init__(
@@ -219,7 +231,7 @@ class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
         elif apply_mapper and self.mapper:
             with torch.no_grad():
                 compressed_embeddings = self.mapper(combined_tensor)
-            embeddings_to_return = compressed_embeddings[2]
+            embeddings_to_return = compressed_embeddings[0]
         else:
             embeddings_to_return = combined_tensor 
 
@@ -284,8 +296,6 @@ class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
         if self.use_autoencoder and self.autoencoder:
             self.autoencoder.to(device)
 
-
-
 if __name__ == "__main__":
 
     big   = ("e5", "mxbai")
@@ -295,7 +305,6 @@ if __name__ == "__main__":
 
     model_names = [MODEL_CATALOGUE[nm1], MODEL_CATALOGUE[nm2]]
     main_models = [SentenceTransformer(nm).to("cuda") for nm in model_names]
-
 
     #CHECKPOINT_PATH = None 
 
@@ -310,4 +319,4 @@ if __name__ == "__main__":
     import mteb
     tasks = mteb.get_tasks(tasks=["NFCorpus"]) 
     evaluation = mteb.MTEB(tasks=tasks, eval_splits=["test"], metric="ndcg@10")
-    results = evaluation.run(combined_model, output_folder = f"results/mix_shit12")
+    results = evaluation.run(combined_model, output_folder = f"results/mix_shit23")

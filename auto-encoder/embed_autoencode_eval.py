@@ -20,46 +20,53 @@ models = {
 
 import torch.nn as nn
 
-INPUT_DIM       = int(sys.argv[1])
-COMPRESSED_DIM  = int(sys.argv[2])
 
-if len(sys.argv) > 3:
-    CHECKPOINT_PATH = sys.argv[3]
+n0 = 768
+n1 = 512
+n2 = 384
 
 class AutoEncoder(nn.Module):
-    def __init__(self, input_dim=INPUT_DIM, compressed_dim=COMPRESSED_DIM):
+    def __init__(self, input_dim=1, compressed_dim=1):
         super(AutoEncoder, self).__init__()
-        
+        # Encoder
         self.encoder = nn.Sequential(
-            nn.Linear(input_dim, 1024),
-            nn.BatchNorm1d(1024),
+            nn.Linear(1024, n0),
+            nn.BatchNorm1d(n0),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Linear(1024, 512),
-            nn.BatchNorm1d(512),
+            nn.Linear(n0, n1),
+            nn.BatchNorm1d(n1),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Linear(512, compressed_dim),
-            nn.BatchNorm1d(compressed_dim),
-            nn.LeakyReLU(0.2, inplace=True)
+            nn.Linear(n1, n2),
+            nn.BatchNorm1d(n2),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Linear(n2, 128),
+
         )
-        
+
+        # Decoder
         self.decoder = nn.Sequential(
-            nn.Linear(compressed_dim, 512),
-            nn.BatchNorm1d(512),
+
+            nn.Linear(128, n2),
+            nn.BatchNorm1d(n2),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Linear(512, 1024),
-            nn.BatchNorm1d(1024),
+            nn.Linear(n2, n1),
+            nn.BatchNorm1d(n1),
             nn.LeakyReLU(0.2, inplace=True),
 
-            nn.Linear(1024, input_dim),
+            nn.Linear(n1, n0),
+            nn.BatchNorm1d(n0),
+            nn.LeakyReLU(0.2, inplace=True),
+
+            nn.Linear(n0, 1024),
         )
-        
+
     def forward(self, x):
         compressed = self.encoder(x)
         reconstructed = self.decoder(compressed)
-        
         return reconstructed, compressed
 
 from typing import List, Union
@@ -152,8 +159,7 @@ class EmbedEncode:
             batch_size=batch_size, 
             show_progress_bar=show_progress_bar,
             device=current_device,
-            convert_to_numpy  =False,  
-            convert_to_tensor =True,  
+            convert_to_numpy  = True,  
             normalize_embeddings=normalize_embeddings,
             **filtered_kwargs  
         )
@@ -196,24 +202,24 @@ class EmbedEncode:
 
 
 from transformers import AutoModel
-r = INPUT_DIM 
-
-print(f"Truncated model >>", r)
 
 model = SentenceTransformer(models["jina-v3"],
                                   trust_remote_code=True,
-                                  truncate_dim = r
                                   ).to("cuda")
 
-#model = AutoModel.from_pretrained("jiaai/jina-embeddings-v3", 
-#autoencoder_path_ =f'models_pth/{INPUT_DIM}_{COMPRESSED_DIM}/{CHECKPOINT_PATH}'
-autoencoder_path_ = None
+
+if len(sys.argv) > 3:
+    INPUT_DIM       = int(sys.argv[1])
+    COMPRESSED_DIM  = int(sys.argv[2])
+    CHECKPOINT_PATH = sys.argv[3]
+
+autoencoder_path_ = "models_pth/2048_1024/000504.pth"
 
 combined_model = EmbedEncode(
     model=model,
     autoencoder_path=autoencoder_path_,  
-    input_dim=INPUT_DIM,  
-    compressed_dim=COMPRESSED_DIM,
+    input_dim=1024,  
+    compressed_dim=128,
     device='cuda' if torch.cuda.is_available() else 'cpu'
 )
 
@@ -221,8 +227,7 @@ eval_ = True
 if eval_:
     tasks = mteb.get_tasks(tasks=["NFCorpus"]) 
     evaluation = mteb.MTEB(tasks=tasks, eval_splits=["test"], metric="ndcg@10")
-#    results = evaluation.run(combined_model, output_folder = f"results/jina_{COMPRESSED_DIM}_{CHECKPOINT_PATH}")
     results = evaluation.run(combined_model, 
-                             output_folder = f"results/jina_dim_{r}",
+                             output_folder = f"results/jina_dim_128_504",
                              batch_size = 16
                              )

@@ -17,7 +17,7 @@ BATCH_SIZE = 32
 NUM_EPOCHS = 30
 
 # optimizer // scheduler
-LEARNING_RATE = 6e-4
+LEARNING_RATE = 1e-3
 WEIGHT_DECAY  = 4e-5
 
 STEP_SIZE = 4

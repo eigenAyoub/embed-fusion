@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from pathlib import Path
 
-from data_loader import get_data_loaders
+from data_loader import get_data_loaders, get_data
 from model import AutoEncoder, initialize_weights
 from config import (
     DEVICE,
@@ -63,7 +63,9 @@ def train():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     # Prepare data loaders
-    train_loader, val_loader = get_data_loaders()
+    #train_loader, val_loader = get_data_loaders()
+    
+    train_loader = get_data("data/jina_embeddings.npy")
 
     # Initialize the model
     model = AutoEncoder(INPUT_DIM, COMPRESSED_DIM).to(DEVICE)
@@ -123,22 +125,22 @@ def train():
         train_losses.append(epoch_loss)
             
         # Validation
-        model.eval()
-        val_running_loss = 0.0
-
-        with torch.no_grad():
-            for batch_inputs in val_loader:
-                batch_inputs = batch_inputs.to(DEVICE)
-                outputs, _ = model(batch_inputs)
-                loss = criterion(outputs, batch_inputs)
-                val_running_loss += loss.item() * batch_inputs.size(0)
+        #model.eval()
+        #val_running_loss = 0.0
+        #with torch.no_grad():
+        #    for batch_inputs in val_loader:
+        #        batch_inputs = batch_inputs.to(DEVICE)
+        #        outputs, _ = model(batch_inputs)
+        #        loss = criterion(outputs, batch_inputs)
+        #        val_running_loss += loss.item() * batch_inputs.size(0)
         
-        val_epoch_loss = val_running_loss / len(val_loader.dataset)
-        val_losses.append(val_epoch_loss)
-        
+        #val_epoch_loss = val_running_loss / len(val_loader.dataset)
+        #val_losses.append(val_epoch_loss)
+        val_epoch_loss = epoch_loss 
         scheduler.step()
         
-        print(f'Epoch {epoch+1}/{NUM_EPOCHS}, Train Loss: {epoch_loss:.6f}, Val Loss: {val_epoch_loss:.6f}')
+        #print(f'Epoch {epoch+1}/{NUM_EPOCHS}, Train Loss: {epoch_loss:.6f}, Val Loss: {val_epoch_loss:.6f}')
+        print(f'Epoch {epoch+1}/{NUM_EPOCHS}, Train Loss: {epoch_loss:.6f}')
         
         # Early Stopping
         if val_epoch_loss < best_val_loss:
@@ -164,7 +166,7 @@ def train():
         #if (epoch + 1) % 10 == 0:
         #    visualize_reconstructions(model, val_loader, epoch+1)
 
-    plot_losses(train_losses_batches, val_losses, num_epochs=5)
+    #plot_losses(train_losses_batches, val_losses, num_epochs=5)
     
     
 def visualize_reconstructions(model, data_loader, epoch):

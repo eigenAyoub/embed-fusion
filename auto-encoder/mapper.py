@@ -51,7 +51,7 @@ x_train, x_val, y_train_768, y_val_768, y_train_1024, y_val_1024, original_train
 )
 
 # Create DataLoaders
-batch_size = 64
+batch_size = 16
 
 train_dataset = TensorDataset(x_train, y_train_768, y_train_1024, original_train)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -65,20 +65,32 @@ class MappingNet(nn.Module):
     def __init__(self):
         super(MappingNet, self).__init__()
 
-        self.layer_2048= nn.Sequential(
+        self.layer_768_2048 = nn.Sequential(
             nn.Linear(768, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(0.2, inplace=True)
         )
-
-        self.layer_2048_768 = nn.Sequential(
-            nn.Linear(2048, 768),
+        
+        self.layer_2048_1024 = nn.Sequential(
+            nn.Linear(2048, 1024),
+            nn.BatchNorm1d(1024),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        
+        self.layer_1024_768 = nn.Sequential(
+            nn.Linear(1024, 768),
             nn.BatchNorm1d(768),
             nn.LeakyReLU(0.2, inplace=True)
         )
         
-        self.layer_768_2048 = nn.Sequential(
-            nn.Linear(768, 2048),
+        self.layer_768_1024 = nn.Sequential(
+            nn.Linear(768, 1024),
+            nn.BatchNorm1d(1024),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        
+        self.layer_1024_2048 = nn.Sequential(
+            nn.Linear(1024, 2048),
             nn.BatchNorm1d(2048),
             nn.LeakyReLU(0.2, inplace=True)
         )
@@ -94,11 +106,18 @@ class MappingNet(nn.Module):
                 nn.init.zeros_(m.bias)
                 
     def forward(self, x):
-        out0 = self.layer_2048(x)                        # 1024 dim
-        out1 = self.layer_2048_768(out0) + x       # 2048 dim
-        out2 = self.layer_768_2048(out1)              # 1024 dim
-#        final_out = self.final_layer(out2) + x             # 768 dim
-        return out2, out0, out1
+        out1 = self.layer_768_2048(x)       # 2048
+        out2 = self.layer_2048_1024(out1)   # 1024
+        out3 = self.layer_1024_768(out2)  + x  # 768
+        out4 = self.layer_768_1024(out3)    # 1024
+        out5 = self.layer_1024_2048(out4)   # 2048
+        return out3, out2, out4, out1, out5
+
+# then  add residual connections.
+# slowly: +x then +out2 the +out5
+# remove leaky relu on the 768 layer 
+# add a new filler layer between 2048 and 1024 (another 1024 that is not used for the loss)
+
 
 # Initialize the model
 model = MappingNet()
@@ -135,13 +154,17 @@ for epoch in range(num_epochs):
 
         optimizer.zero_grad()
 
-        out2048, out1024, final_out = model(batch_inputs)
+        out3, out2, out4, out1, out5 = model(batch_inputs)
         
-        #loss1024 = criterion(out1024, batch_tar_1024)  
-        #loss2048 = criterion(out2048, batch_original)  
-        #loss2 = criterion(final_out, batch_tar_768)
-        #loss = loss1024 + loss2048 + loss2
-        loss = criterion(out2048, out1024) + criterion(out2048, batch_original) + criterion(out1024, batch_original)
+        #loss1024 = criterion(out2, out4)  
+        loss2048 = criterion(out1, out5)  
+        loss2    = criterion(out1, batch_original) 
+        loss3    = criterion(out5, batch_original) 
+
+        #rest     = criterion(out5, batch_original)
+        
+        #loss =  loss1024 + loss2048 + loss2 + loss3
+        loss =   loss2048 + loss2  + loss3
 
         loss.backward()
         optimizer.step()
@@ -167,17 +190,13 @@ for epoch in range(num_epochs):
             batch_original = batch_original.to(device)
 
 
-            out2048, out1024, final_out = model(batch_inputs)
-            
-#            loss1024 = criterion(out1024, batch_tar_1024)  
-#            loss2048 = criterion(out2048, batch_original)  
-#            loss2 = criterion(final_out, batch_tar_768)
-#            loss = loss1024 + loss2048 + loss2
+            #loss1024 = criterion(out2, out4)  
+            loss2048 = criterion(out1, out5)  
+            loss2    = criterion(out1, batch_original) 
+            loss3    = criterion(out5, batch_original) 
 
+            loss =   loss2048 + loss2  + loss3
 
-            loss = criterion(out2048, out1024) + criterion(out2048, batch_original) + criterion(out1024, batch_original)
-
-            
             total_val_loss += loss.item()
 
     avg_val_loss = total_val_loss / len(val_loader)
@@ -185,6 +204,7 @@ for epoch in range(num_epochs):
     print(f"Epoch [{epoch+1}/{num_epochs}], "
           f"Train Loss: {avg_train_loss:.6f}, "
           f"Val Loss: {avg_val_loss:.6f}")
+#    print(f"Reconstruction loss: {loss2048.item(), loss1024.item()}")
 
     # Early stopping
     if avg_val_loss < best_val_loss:

@@ -51,3 +51,22 @@ def get_data_loaders():
     return train_loader, val_loader
 
 
+
+def get_data(path):
+    train_data = np.load(path)
+    
+    print(f"Loaded train embeddings of shape: {train_data.shape}")
+    
+    train_dataset = EmbeddingDataset(train_data)
+    
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=BATCH_SIZE, 
+        #shuffle=True, 
+        num_workers=NUM_WORKERS
+    )
+    
+    
+    return train_loader 
+
+
