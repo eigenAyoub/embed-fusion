@@ -11,22 +11,24 @@ import os
 import sys
 
 from model import AutoEncoder 
-from config import MODEL_CATALOGUE # {model_name: model_hugging_face_id}
+from config import MODEL_CATALOGUE, INPUT_DIM, COMPRESSED_DIM
 
+#from datasets import config as datasets_config
+#datasets_config.TRUST_REMOTE_CODE = True
+#os.environ["HF_DATASETS_TRUST_REMOTE_CODE"] = "true"
 
-#features = "86 175 155 369 209 353  57  24 154 265  76  40 362  58 376  61 228  82 133 204 108 113 350 286 293 264  33  45   7 237  71 344 195 352 150  30  59 374 134  65  49 262 302  52 235 148 123 333 132 275  12 168 152  36 109 229  19  42  74 283 289  13 383  83 332 331 370  39  89 106 301  60 363 183  95 187 287   3  37  23 219  97 355 346 217 101 288 253  96 166 102 358 340 122 178 373 345 278 243  44"
-features = " 86 175 155 369 209 353  24  57  76 154 265 362  40  58 376  61 133 108 228  82 204 286 113 350   7 264 344 293  33  45 237  71 352 150 195  59  30 262 374 148  52  65 134 302  49  12 235 229 132 333 152  19 123 275  168  36 109 283 289 331  74  42  83  13 383 332  89 370 106   3  39 301   60  95 187 183 287  23  37 363 217 288 219 101 355  97 122 346 253 102  166  96 340 358 178 373  44 345 100 278 167 206 318 342 312 243 205 177  367  88 110 281 303 328 117 224 241 380 313  15 297  43 169 171 268 368  119 230 269 349 105  22 179  41 325 182  32 197 199 121  93 242 181 351   79 161  99 270  68 348"
-selected_bge_features = [int(num) for num in features.split()]
-#selected_bge_features = list(np.random.choice(range(384), 100, replace=False))
-print(selected_bge_features)
+import random
+#x  = random.sample(range(384), 50)
+#print(x)
+
 
 class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
     def __init__(
         self, 
         models, 
 
-        pca_path: str = "../exploration/models/pca/bge_pca_200.pkl",
-        scaler_path: str = "../exploration/models/pca/bge_scaler_200.pkl",
+        pca_path: str = "../exploration/models/pca/bge_pca_300_norm.pkl",
+        scaler_path: str = "../exploration/models/pca/bge_scaler_300_norm.pkl",
 
         autoencoder_path: str = None,
         input_dim: int = 2048,  
@@ -121,7 +123,7 @@ class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
         device="cuda",
         convert_to_numpy=True,
         convert_to_tensor=False,
-        normalize_embeddings=False,
+        normalize_embeddings=True,
         use_autoencoder: bool = None,
         **kwargs  # Capture all additional keyword arguments
     ):
@@ -156,43 +158,40 @@ class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
         if unexpected_kwargs:
             print(f"Warning: Ignoring unexpected keyword arguments: {unexpected_kwargs}")
 
+        apply_autoencoder = use_autoencoder if use_autoencoder is not None else self.use_autoencoder
+
         embeddings = []
         for idx, model in enumerate(self.models):
             emb = model.encode(
                 sentences,
                 batch_size=batch_size,
                 show_progress_bar=show_progress_bar,
-                device=device,
                 convert_to_numpy=True,  # Always get NumPy for concatenation
                 normalize_embeddings=normalize_embeddings,
                 **filtered_kwargs  # Pass only allowed kwargs
             )
-            if idx == 1:  
-#                emb = emb[:, selected_bge_features]
-                emb_std = self.scaler.transform(emb)
-                emb_pca = self.pca.transform(emb_std)
-                emb = emb_pca  # Now emb has shape (num_samples, 50)
-                print(f"Applied PCA to bge-small embeddings. New shape: {emb.shape}")
+            
+            #if idx == 0:  
+            #    emb = emb[:, x]
+                #if apply_autoencoder and self.autoencoder:
+                #    emb = torch.tensor(emb, dtype=torch.float32).to(device)
+                #    with torch.no_grad():
+                #        compressed_embeddings = self.autoencoder.encoder(emb)
+                #    emb = compressed_embeddings.cpu().numpy()
+
+            #    print("we are here mf")
+            #    print(emb.shape)
+#               emb = emb[:, selected_bge_features]
+                #emb_std = self.scaler.transform(emb)
+                #emb_pca = self.pca.transform(emb_std)
+                #emb = emb_pca  # Now emb has shape (num_samples, 50)
+                #print(f"Applied PCA to bge-small embeddings. New shape: {emb.shape}")
 
             embeddings.append(emb) 
 
-#        embeddings = [
-#            model.encode(
-#                sentences,
-#                batch_size=batch_size,
-#                show_progress_bar=show_progress_bar,
-#                device=device,
-#                convert_to_numpy=True,  # Always get NumPy for concatenation
-#                normalize_embeddings=normalize_embeddings,
-#                **filtered_kwargs  # Pass only allowed kwargs
-#            )
-#            for model in self.models
-#        ]
-
         combined_embeddings = np.concatenate(embeddings, axis=1)
-        print("fuck you", combined_embeddings.shape)
-        combined_tensor = torch.tensor(combined_embeddings, dtype=torch.float32).to(device)
 
+        combined_tensor = torch.tensor(combined_embeddings, dtype=torch.float32).to(device)
         apply_autoencoder = use_autoencoder if use_autoencoder is not None else self.use_autoencoder
         if apply_autoencoder and self.autoencoder:
             with torch.no_grad():
@@ -201,9 +200,17 @@ class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
         else:
             embeddings_to_return = combined_tensor 
 
-        # Convert to desired format
+
+        print(">>>>>>> size check before ", embeddings_to_return.shape)
+        #embeddings_to_return = embeddings_to_return[:,:64]
+        #print(">>>>>>> size check after  ", embeddings_to_return.shape)
+
+        
+        
+        #Convert to desired format
         if convert_to_numpy:
             embeddings_to_return = embeddings_to_return.cpu().numpy()
+            #embeddings_to_return = combined_embeddings 
         elif convert_to_tensor:
             embeddings_to_return = embeddings_to_return
         else:
@@ -303,16 +310,26 @@ class CombinedSentenceTransformer(nn.Module, PyTorchModelHubMixin):
 
 
 if __name__ == "__main__":
+   
+    #import datasets
+    #from datasets import load_dataset as original_load_dataset
+    #def load_dataset_patched(*args, **kwargs):
+    #    kwargs["trust_remote_code"] = True
+    #    return original_load_dataset(*args, **kwargs)
+    #datasets.load_dataset = load_dataset_patched
     
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    #big   = ("e5", "mxbai")
+    #small = ("e5-small", "bge-small")
 
-    big   = ("e5", "mxbai")
-    small = ("e5-small", "bge-small")
-
-    nm1, nm2 = small 
-
+    bge_snow = ("bge-small", "snowflake-m")
+    nm1, nm2 = bge_snow  
     model_names = [MODEL_CATALOGUE[nm1], MODEL_CATALOGUE[nm2]]
-    main_models = [SentenceTransformer(nm).to("cuda") for nm in model_names]
+
+    model_names = [MODEL_CATALOGUE[nm2]]
+
+    print(f"Models > {model_names}")
+
+    main_models = [SentenceTransformer(nm, trust_remote_code=True).to("cuda") for nm in model_names]
     
     #for m in main_models:
     #    print(m.get_model_name())
@@ -325,38 +342,20 @@ if __name__ == "__main__":
 
     combined_model = CombinedSentenceTransformer(
         models=main_models,  
-        device='cuda'
-    )
-    #    autoencoder_path=path_to_checkpoint,
-    #    input_dim=INPUT_DIM,
-    #    compressed_dim=COMPRESSED_DIM,
-        # combined_model.mteb_eval("NFCorpus")
-    
+        device='cuda',
+        #autoencoder_path=f"{path_to_checkpoint}.pth",
+        #input_dim=INPUT_DIM,
+        #compressed_dim=COMPRESSED_DIM
+        )
+   
     import mteb
 
     tasks = mteb.get_tasks(tasks=["NFCorpus"]) 
+
     evaluation = mteb.MTEB(tasks=tasks, eval_splits=["test"], metric="ndcg@10")
     results = evaluation.run(combined_model, 
-                             output_folder = f"results/wtf_pca_200",
-                             batch_size = 16
+                             #output_folder = f"results/{path_to_checkpoint}.pth",
+                             output_folder = f"results/snowy02",
+                             batch_size = 128
                              )
     
-    """
-#    e5_path_embeddings    =  "../data/new_e5_wiki_500k/train_embeddings.npy"
-#    mxbai_path_embeddings =  "../data/new_mxbai_wiki_500k/train_embeddings.npy"
-    data_1 =  np.load("../generate_data/embeddings_data/new_e5_wiki_500k/train_embeddings.npy")
-    data_2 =  np.load("../generate_data/embeddings_data/new_mxbai_wiki_500k/train_embeddings.npy")
-    data_3 =  np.load("../generate_data/embeddings_data/new_e5_wiki_500k/val_embeddings.npy")
-    data_4 =  np.load("../generate_data/embeddings_data/new_mxbai_wiki_500k/val_embeddings.npy")
-    data_train = np.concatenate((data_1, data_2), axis=1)
-    data_val   = np.concatenate((data_3, data_4), axis=1)
-    autoencoder = AutoEncoder(input_dim=INPUT_DIM, compressed_dim=COMPRESSED_DIM)
-    autoencoder.load_state_dict(torch.load(autoencoder_path, map_location=device))
-    autoencoder_train = autoencoder(data_train)[0]
-    autoencoder_val   = autoencoder(data_train)[0]
-
-    #np.save()
-    #mse = nn.MSELoss() 
-    #print(f"Loss is > ", mse(y, data))
-    #emb_paths [e5_path_embeddings, mxbai_path_embeddings]
-    """    

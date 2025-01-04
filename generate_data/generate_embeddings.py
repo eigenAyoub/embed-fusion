@@ -17,20 +17,20 @@ from sentence_transformers import SentenceTransformer
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 models = {
-            "mxbai"     : "mixedbread-ai/mxbai-embed-large-v1",  
-            "bge"       : "BAAI/bge-large-en-v1.5"                 ,
-            "e5"        : "intfloat/e5-large-v2"              ,
-            "snowflake-m" : "Snowflake/snowflake-arctic-embed-m",
-            "snowflake-l" : "Snowflake/snowflake-arctic-embed-l",
+            "mxbai"           : "mixedbread-ai/mxbai-embed-large-v1",  
+            "bge"             : "BAAI/bge-large-en-v1.5"                 ,
+            "e5"              : "intfloat/e5-large-v2"              ,
+            "snowflake-l"     : "Snowflake/snowflake-arctic-embed-l",
             "gte-base"        : "thenlper/gte-base",
             "gte-large"       : "thenlper/gte-large",
             "gte-small"       : "thenlper/gte-small",
             "e5-small"        : "intfloat/e5-small-v2", # (33M)
             "bge-small"       : "BAAI/bge-small-en-v1.5", # (33M)
+            "snowflake-m"     : "Snowflake/snowflake-arctic-embed-m-v1.5",
             "jina-v3"         : "jinaai/jina-embeddings-v3"
 }
 
-m_name = models["jina-v3"] 
+m_name = models["bge-small"] 
 
 split_dir = "split_indices"
 wiki_path = os.path.join(split_dir, "all_paragraphs.pkl")
@@ -42,10 +42,10 @@ import pickle
 with open(wiki_path, 'rb') as f:
     all_paragraphs = pickle.load(f)
 
-
-all_paragraphs = all_paragraphs[:10_000] 
+#all_paragraphs = all_paragraphs[:10_000] 
 
 num_samples = len(all_paragraphs)
+
 print(f"Train set size: {len(train_indices)}")
 print(f"Validation set size: {len(val_indices)}")
 print(f"Total passages loaded: {num_samples}")
@@ -91,16 +91,17 @@ print(f"Embeddings shape: {embeddings.shape}")
 
 # Split embeddings based on saved indices
 
-#train_data = embeddings[train_indices]
-#val_data = embeddings[val_indices]
+train_data = embeddings[train_indices]
+val_data = embeddings[val_indices]
 
 # Save embeddings using compressed .npz format to save space
-#save_dir = f"embeddings_data/new_{m_name}_wiki_500k"
-#os.makedirs(save_dir, exist_ok=True)
+save_dir = f"embeddings_data/nnew_{m_name}_wiki_500k"
+os.makedirs(save_dir, exist_ok=True)
 
-#np.save(os.path.join(save_dir, "train_embeddings.npy"), train_data)
-#np.save(os.path.join(save_dir, "val_embeddings.npy"),   val_data)
-#print(f"Train embeddings saved to: {save_dir}/train_embeddings.npy")
-#print(f"Validation embeddings saved to: {save_dir}/val_embeddings.npy")
+np.save(os.path.join(save_dir, "train_embeddings.npy"), train_data)
+np.save(os.path.join(save_dir, "val_embeddings.npy"),   val_data)
 
-np.save(os.path.join(save_dir, "jina_embeddings.npy"), embeddings)
+print(f"Train embeddings saved to: {save_dir}/train_embeddings.npy")
+print(f"Validation embeddings saved to: {save_dir}/val_embeddings.npy")
+
+#np.save(os.path.join(save_dir, "bge-small-all.npy"), embeddings)

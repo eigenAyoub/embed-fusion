@@ -12,12 +12,12 @@ models = {
             "mxbai"     : "mixedbread-ai/mxbai-embed-large-v1",
             "bge"       : "BAAI/bge-large-en-v1.5",
             "e5"        : "intfloat/e5-large-v2"  ,
-            "snowflake" : "Snowflake/snowflake-arctic-embed-m",
             "snowflake-l" : "Snowflake/snowflake-arctic-embed-l",
             "gte-base"        : "thenlper/gte-base",
             "gte-large"       : "thenlper/gte-large",
             "gte-small"       : "thenlper/gte-small",
             "e5-small"        : "intfloat/e5-small-v2", # (33M)
+            "snowflake-m" : "Snowflake/snowflake-arctic-embed-m-v1.5",
             "bge-small"       : "BAAI/bge-small-en-v1.5" # (33M)
 }
 
