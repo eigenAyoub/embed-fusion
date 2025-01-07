@@ -3,7 +3,8 @@ import mteb
 from typing import List, Union, Dict, Any, Optional
 
 from mteb.encoder_interface import Encoder, PromptType
-from encoder_residual import EncoderOnly, EncoderConfig 
+
+from encoder_simple import EncoderOnly, EncoderConfig
 
 import torch
 import numpy as np
@@ -13,7 +14,7 @@ import sys
 model_config = EncoderConfig.DEFAULT
 
 inDim = model_config["input_dim"]
-outDim = model_config["max_compressed_dim"]
+outDim = model_config["output_dim"]
 
 class AdaptiveSentenceTransformer(Encoder):
     MODEL_CATALOGUE: Dict[str, str] = {
@@ -68,6 +69,9 @@ class AdaptiveSentenceTransformer(Encoder):
             print("Initializing encoder with provided parameters")
             self.encoder = EncoderOnly(EncoderConfig.DEFAULT).to(device)
             self.encoder.load_state_dict(torch.load(checkpoint_path)["model_state_dict"])
+            print(">> Training mode > ", self.encoder.training)
+            self.encoder.eval()
+            print(">> Training mode > ", self.encoder.training)
         else:
             print(f"No encoder initialization - will use {'single model' if self.single_model else 'raw concatenation'}")
 
@@ -111,7 +115,7 @@ class AdaptiveSentenceTransformer(Encoder):
                 print(f">> Concatenated tensor shape: {concat.shape}")
                 if hasattr(self, 'encoder'):
                     encoded = self.encoder(concat.to(self.device), 
-                                        compressed_dim=self.truncate)
+                                        dim=self.truncate)
                     print(f">> Returning the encoder tensor shape: {encoded.shape}")
                     return encoded
                 else:
@@ -163,9 +167,10 @@ def main():
         
     ckpt = sys.argv[1] 
     trunc = int(sys.argv[2]) 
-    model_type = sys.argv[3] # `combined` oder ... 
+    model_type = sys.argv[3] # `combined` oder `model_name` (single model)
     tsk  = sys.argv[4]
     use_encoder = bool(int(sys.argv[5])) if len(sys.argv) > 5 else False
+    random_tag = sys.argv[6] 
 
     # Configure model based on type
     if model_type == "combined":
@@ -178,13 +183,13 @@ def main():
             compressed_dim=768 if use_encoder else None,
             truncate=trunc if use_encoder else None
         )
-        output_folder = f"results/residual"
+        output_folder = f"results/{random_tag}"
     else:
         model = AdaptiveSentenceTransformer(
             models=[model_type],
             device="cuda"
         )
-        output_folder = f"results/{tsk}_{model_type}"
+        output_folder = f"results/{tsk}_{model_type}_{random_tag}"
     
     # Setup evaluation
     tasks = mteb.get_tasks(tasks=[tsk])
@@ -205,3 +210,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+## to just test bge-small:
+
+##  python eval.py x 384 bge-small NFCorpus 0 bge-small-only-nfc

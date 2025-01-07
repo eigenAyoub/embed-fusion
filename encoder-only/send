@@ -1,0 +1,8 @@
+cp -P 30710  root@ackbar.dimis.fim.uni-passau.de:/root/embed-fusion/encoder-only/eval.py    .
+
+cp -P 30710  root@ackbar.dimis.fim.uni-passau.de:/root/embed-fusion/encoder-only/encoder_simple.py    .
+
+cp -P 30710  root@ackbar.dimis.fim.uni-passau.de:/root/embed-fusion/encoder-only/models_pth/1152_512/xx  .
+
+e2abda6954d3c39b7837
+

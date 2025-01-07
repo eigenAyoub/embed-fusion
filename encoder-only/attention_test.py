@@ -7,14 +7,17 @@ import torch.nn.functional as F
 from torch.nn.functional import normalize
 from transformers import AutoTokenizer, AutoModel
 
-
+"""
 ## Plan:
 
-
-## load wiki:
-
-
-
+0. Load the models 
+1. Load wiki
+3. Undertand how bert internals work.
+4. Recover the last token based layer
+5. do you need to normalize before?
+6. Which model to use for V and which to use for Qk?
+7. Mini training run with tokens instead
+"""
 
 
 ## model IDS 

@@ -8,8 +8,9 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 from data_loader import get_data
+from loss import SimilarityLoss 
 
-from encoder_simple import EncoderOnly, EncoderConfig, initialize_weights
+from encoder_simple import EncoderOnly, EncoderConfig 
 
 
 from config import (
@@ -27,44 +28,10 @@ from config import (
 model_config = EncoderConfig.DEFAULT
 
 inDim = model_config["input_dim"]
-outDim = model_config["max_compressed_dim"]
+#outDim = model_config["max_compressed_dim"]
+outDim = model_config["output_dim"]
 
-class SimilarityLoss(nn.Module):
-    """Loss based on cosine similarity between all pairs in batch"""
-    def __init__(self, weight: float = 1.0):
-        super().__init__()
-        self.weight = weight
 
-    def forward(self, model_output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        sim_outputs = nn.functional.cosine_similarity(model_output.unsqueeze(1), model_output.unsqueeze(0), dim=-1)
-        sim_targets = nn.functional.cosine_similarity(targets.unsqueeze(1), targets.unsqueeze(0), dim=-1)
-
-        mask = torch.eye(sim_outputs.size(0), device=sim_outputs.device).bool()
-        sim_outputs = sim_outputs.masked_fill(mask, 0)
-        sim_targets = sim_targets.masked_fill(mask, 0)
-        
-        loss = torch.mean((sim_outputs - sim_targets) ** 2)
-        return self.weight * loss
-
-class SimilarityLossTopK(nn.Module):
-    """Loss based on top-k cosine similarities between pairs in batch"""
-    def __init__(self, weight: float = 1.0, k: int = 10):
-        super().__init__()
-        self.weight = weight
-        self.k = k
-
-    def forward(self, model_output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        sim_outputs = nn.functional.cosine_similarity(model_output.unsqueeze(1), model_output.unsqueeze(0), dim=-1)
-        sim_targets = nn.functional.cosine_similarity(targets.unsqueeze(1), targets.unsqueeze(0), dim=-1)
-
-        mask = torch.eye(sim_outputs.size(0), device=sim_outputs.device).bool()
-        sim_outputs = sim_outputs.masked_fill(mask, -float('inf'))
-        sim_targets = sim_targets.masked_fill(mask, -float('inf'))
-
-        topk_values, topk_indices = sim_targets.topk(self.k, dim=-1)
-        topk_sim_outputs = sim_outputs.gather(1, topk_indices)
-        loss = torch.mean((topk_sim_outputs - topk_values) ** 2)
-        return self.weight * loss
 
 class Trainer:
     """Handles model training, validation, and visualization"""
@@ -88,10 +55,8 @@ class Trainer:
         self.val_loader = val_loader
         self.device = device
         
-        self.criterion = (
-            SimilarityLossTopK(weight=loss_weight, k=k) if use_topk 
-            else SimilarityLoss(weight=loss_weight)
-        )
+        #self.criterion = ImprovedSimilarityLoss(weight=loss_weight)
+        self.criterion = SimilarityLoss(weight=loss_weight)
         
         self.optimizer = optim.AdamW(
             model.parameters(),
@@ -163,11 +128,11 @@ class Trainer:
             'best_val_loss': self.best_val_loss
         }
 
-        tag = f"epoch_{epoch:03d}_loss_{val_loss:.6f}.pth"
+        tag = f"784_epoch_{epoch:03d}.pth"
 
         # Regular checkpoint
         if epoch % self.save_freq == 0:
-            path = self.checkpoint_dir / f'checkpoint_{epoch:03d}.pth'
+            path = self.checkpoint_dir / f'784_{epoch:03d}.pth'
             torch.save(checkpoint, path)
             print(f"Saved checkpoint to {path}")
             
@@ -229,7 +194,7 @@ def main():
     val_loader = get_data("bge-arctic-val.npy")
     
     model = EncoderOnly(EncoderConfig.DEFAULT)
-    model.apply(initialize_weights)
+    #model.apply(initialize_weights)
     
     trainer = Trainer(
         model, 
