@@ -7,6 +7,7 @@ from mteb.encoder_interface import Encoder, PromptType
 from encoder_simple import EncoderOnly, EncoderConfig
 
 import torch
+import torch.nn.functional as F
 import numpy as np
 
 import sys
@@ -25,10 +26,11 @@ class AdaptiveSentenceTransformer(Encoder):
         "gte-base": "thenlper/gte-base",
         "gte-large": "thenlper/gte-large",
         "gte-small": "thenlper/gte-small",
+        "snowflake-m": "Snowflake/snowflake-arctic-embed-m-v1.5",
+        "jina-v3": "jinaai/jina-embeddings-v3",
         "e5-small": "intfloat/e5-small-v2",
         "bge-small": "BAAI/bge-small-en-v1.5",
-        "snowflake-m": "Snowflake/snowflake-arctic-embed-m-v1.5",
-        "jina-v3": "jinaai/jina-embeddings-v3"
+        "gist":"avsolatorio/GIST-small-Embedding-v0"
     }
 
     def __init__(self, 
@@ -88,6 +90,9 @@ class AdaptiveSentenceTransformer(Encoder):
         
         for model, model_key in zip(self.models, self.model_keys):
             model_kwargs = local_kwargs.copy()
+            model_kwargs["normalize_embeddings"]=False
+            print(">> model_kwargs[ normalize_embeddings ] = ", model_kwargs["normalize_embeddings"])
+
             if "snowflake" in model_key:
                 if self.call_count == 1:
                     print(f"## Updating {model_key} `model_kwargs` ## Setting `prompt_name=PromptType.query`")
@@ -107,12 +112,13 @@ class AdaptiveSentenceTransformer(Encoder):
             embeddings_list.append(embeddings)
 
         if self.single_model:
-            print(f"Operating on a single model")
+            print(f"Operating on a single model, len is {len(embeddings_list)}")
             return embeddings_list[0]
         else:
             if all(isinstance(e, torch.Tensor) for e in embeddings_list):
                 concat = torch.cat(embeddings_list, dim=1)
-                print(f">> Concatenated tensor shape: {concat.shape}")
+                concat = F.normalize(concat, p=2, dim=1)
+                print(f">> Concatenated tensor shape, it is normalized per column as well {concat.shape}")
                 if hasattr(self, 'encoder'):
                     encoded = self.encoder(concat.to(self.device), 
                                         dim=self.truncate)
@@ -184,15 +190,29 @@ def main():
             truncate=trunc if use_encoder else None
         )
         output_folder = f"results/{random_tag}"
+    elif model_type == "all-33":
+        model_keys = ["bge-small", "e5-small", "gist"]
+        print("Are we using an encoder:", use_encoder)
+        model = AdaptiveSentenceTransformer(
+            models=model_keys,
+            device="cuda",
+            checkpoint_path=f"models_pth/{inDim}_{outDim}/{ckpt}.pth" if use_encoder else None,
+            input_dim=1152 if use_encoder else None,
+            compressed_dim=768 if use_encoder else None,
+            truncate=trunc if use_encoder else None
+        )
+        output_folder = f"results/{random_tag}"
     else:
         model = AdaptiveSentenceTransformer(
             models=[model_type],
             device="cuda"
         )
+        print("there we go")
         output_folder = f"results/{tsk}_{model_type}_{random_tag}"
     
     # Setup evaluation
-    tasks = mteb.get_tasks(tasks=[tsk])
+    #tasks = mteb.get_tasks(tasks=[tsk])
+    tasks = mteb.get_tasks(tasks=["NFCorpus", "SciFact", "ArguAna"])
     evaluation = mteb.MTEB(
         tasks=tasks,
         eval_splits=["test"],

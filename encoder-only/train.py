@@ -28,10 +28,7 @@ from config import (
 model_config = EncoderConfig.DEFAULT
 
 inDim = model_config["input_dim"]
-#outDim = model_config["max_compressed_dim"]
 outDim = model_config["output_dim"]
-
-
 
 class Trainer:
     """Handles model training, validation, and visualization"""
@@ -190,8 +187,8 @@ class Trainer:
 def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     
-    train_loader = get_data("bge-arctic-train.npy")
-    val_loader = get_data("bge-arctic-val.npy")
+    train_loader = get_data("../generate_data/embeddings_data/all_three_train.npy")
+    val_loader = get_data("../generate_data/embeddings_data/all_three_val.npy")
     
     model = EncoderOnly(EncoderConfig.DEFAULT)
     #model.apply(initialize_weights)

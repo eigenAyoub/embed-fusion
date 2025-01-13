@@ -33,10 +33,7 @@ GAMMA = 0.1
 PATIENCE = 10
 
 
-#COMPRESSED_DIMENSIONS = [8, 16, 32, 64, 128, 256, 384, 512, 784]  # Multiple compressed dimensions
-#COMPRESSED_DIMENSIONS = [128, 256, 512]  # Multiple compressed dimensions
-#MAX_COMPRESSED_DIM = 784 
-COMPRESSED_DIMENSIONS = [64, 128, 384]  # Multiple compressed dimensions
+COMPRESSED_DIMENSIONS = [256, 384, 512, 768]  # Multiple compressed dimensions
 
 LOSS_WEIGHTS = {
     64: 2,    # Highest priority

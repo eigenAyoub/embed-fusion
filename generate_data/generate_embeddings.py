@@ -24,13 +24,14 @@ models = {
             "gte-base"        : "thenlper/gte-base",
             "gte-large"       : "thenlper/gte-large",
             "gte-small"       : "thenlper/gte-small",
+            "snowflake-m"     : "Snowflake/snowflake-arctic-embed-m-v1.5",
+            "jina-v3"         : "jinaai/jina-embeddings-v3",
+            "gist":"avsolatorio/GIST-small-Embedding-v0", # (33M)
             "e5-small"        : "intfloat/e5-small-v2", # (33M)
             "bge-small"       : "BAAI/bge-small-en-v1.5", # (33M)
-            "snowflake-m"     : "Snowflake/snowflake-arctic-embed-m-v1.5",
-            "jina-v3"         : "jinaai/jina-embeddings-v3"
 }
 
-m_name = models["bge-small"] 
+m_name = models["gist"] 
 
 split_dir = "split_indices"
 wiki_path = os.path.join(split_dir, "all_paragraphs.pkl")
@@ -79,11 +80,6 @@ for i in tqdm(range(num_batches), desc="Generating Embeddings"):
 
     embeddings.append(batch_embeddings)
     
-    # Log GPU memory usage after each batch
-    #allocated = torch.cuda.memory_allocated(device) / (1024 ** 3)
-    #reserved = torch.cuda.memory_reserved(device) / (1024 ** 3)
-    #print(f"Batch {i+1}/{num_batches}: Allocated GPU Memory: {allocated:.2f} GB, Reserved GPU Memory: {reserved:.2f} GB")
-
 embeddings = np.vstack(embeddings)
 
 print(f"Embeddings shape: {embeddings.shape}")

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 class EncoderConfig:
     DEFAULT = {
         'input_dim': 1152,
-        'output_dim': 384,
+        'output_dim': 768,
         'dropout': 0.1
     }
 class EncoderOnly(nn.Module):
