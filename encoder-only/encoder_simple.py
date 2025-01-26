@@ -1,12 +1,21 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class EncoderConfig:
     DEFAULT = {
-        'input_dim': 1152,
-        'output_dim': 768,
+        'input_dim': 1920,
+        'output_dim': 1024,
         'dropout': 0.1
     }
+
+outDim = EncoderConfig.DEFAULT["output_dim"]
+
+#COMPRESSED_DIMENSIONS = [64, 128, 256, 384, 512, 768, 896, outDim] # high MRL
+#COMPRESSED_DIMENSIONS = [256, 512, 768, outDim]  # mid MRL
+COMPRESSED_DIMENSIONS = [512, outDim]   # low MRL
+
+
 class EncoderOnly(nn.Module):
     def __init__(self, config: dict = None):
         super().__init__()

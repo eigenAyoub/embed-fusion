@@ -6,18 +6,10 @@ import torch
 # Device configuration
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-#SAVE_DIR = "../data/bge-small_wiki_500k"
-
-# autoenc
-INPUT_DIM = 2048 
-COMPRESSED_DIM = 64
-
-#BEST_MODEL_PATH = f"models_pth/{COMPRESSED_DIM}/"
-PLOT_PATH= f"loss_curve_{COMPRESSED_DIM}_6.pth"
+PLOT_PATH= f"loss_curve.pth"
 
 # can we optimmize this? why 64 work worse? where do you even need it?
 NUM_WORKERS = 64 
-
 TOKENIZERS_PARALLELISM = "false"
 
 BATCH_SIZE = 64
@@ -31,9 +23,6 @@ STEP_SIZE = 4
 GAMMA = 0.1
 
 PATIENCE = 10
-
-
-COMPRESSED_DIMENSIONS = [256, 384, 512, 768]  # Multiple compressed dimensions
 
 LOSS_WEIGHTS = {
     64: 2,    # Highest priority

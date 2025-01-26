@@ -177,10 +177,30 @@ def main():
     tsk  = sys.argv[4]
     use_encoder = bool(int(sys.argv[5])) if len(sys.argv) > 5 else False
     random_tag = sys.argv[6] 
+    
+    if use_encoder:
+        print(f"Reading checkpoint from: models_pth/{inDim}_{outDim}/{ckpt}.pth")
 
     # Configure model based on type
     if model_type == "combined":
-        model_keys = ["bge-small", "snowflake-m"]
+        #model_keys = ["bge-small", "snowflake-m"]
+        #model_keys = ["gist", "snowflake-m"]
+        model_keys = ["e5-small", "snowflake-m"]
+        print(f"We are concatenating {model_keys[0]} and {model_keys[1]}")
+        print(f"Are we using an encoder > {use_encoder}")
+
+        model = AdaptiveSentenceTransformer(
+            models=model_keys,
+            device="cuda",
+            checkpoint_path=f"models_pth/{inDim}_{outDim}/{ckpt}.pth" if use_encoder else None,
+            input_dim=inDim if use_encoder else None,
+            compressed_dim=outDim if use_encoder else None,
+            truncate=trunc if use_encoder else None
+        )
+        output_folder = f"results/{random_tag}"
+    elif model_type == "all-33":
+        model_keys = ["bge-small", "e5-small", "gist"]
+        print("Are we using an encoder:", use_encoder)
         model = AdaptiveSentenceTransformer(
             models=model_keys,
             device="cuda",
@@ -190,9 +210,9 @@ def main():
             truncate=trunc if use_encoder else None
         )
         output_folder = f"results/{random_tag}"
-    elif model_type == "all-33":
-        model_keys = ["bge-small", "e5-small", "gist"]
-        print("Are we using an encoder:", use_encoder)
+    elif model_type == "all-4":
+        model_keys = ["bge-small", "e5-small", "gist", "snowflake-m"]
+        print("Are we using an encoder with 4 models", use_encoder)
         model = AdaptiveSentenceTransformer(
             models=model_keys,
             device="cuda",
@@ -211,12 +231,15 @@ def main():
         output_folder = f"results/{tsk}_{model_type}_{random_tag}"
     
     # Setup evaluation
-    #tasks = mteb.get_tasks(tasks=[tsk])
-    tasks = mteb.get_tasks(tasks=["NFCorpus", "SciFact", "ArguAna"])
+    #tasks = mteb.get_tasks(tasks=["NFCorpus", "SciFact", "ArguAna"])
+
+    tasks = mteb.get_tasks(tasks=[tsk])
+
+    print(f"Eval on {tsk} Starting")
+    
     evaluation = mteb.MTEB(
         tasks=tasks,
         eval_splits=["test"],
-        metric="ndcg@10"
     )
     
     results = evaluation.run(
@@ -232,5 +255,5 @@ if __name__ == "__main__":
     main()
 
 ## to just test bge-small:
-
-##  python eval.py x 384 bge-small NFCorpus 0 bge-small-only-nfc
+# python eval.py 1152_784_ep_020 784 combined xx 1 e5-arctic-norm-20
+# python eval.py x 384 bge-small NFCorpus 0 bge-small-only-nfc

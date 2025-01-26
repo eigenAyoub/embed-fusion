@@ -10,9 +10,7 @@ import matplotlib.pyplot as plt
 from data_loader import get_data
 from loss import SimilarityLoss 
 
-from encoder_simple import EncoderOnly, EncoderConfig 
-
-
+from encoder_simple import EncoderOnly, EncoderConfig, COMPRESSED_DIMENSIONS
 from config import (
     DEVICE,
     LEARNING_RATE,
@@ -20,15 +18,16 @@ from config import (
     STEP_SIZE,
     GAMMA,
     NUM_EPOCHS,
-    PATIENCE,
     PLOT_PATH,
-    COMPRESSED_DIMENSIONS,
 )
 
 model_config = EncoderConfig.DEFAULT
 
 inDim = model_config["input_dim"]
 outDim = model_config["output_dim"]
+n_losses = len(COMPRESSED_DIMENSIONS)
+
+print("We are using the following dims for the MRL loss: ", COMPRESSED_DIMENSIONS)
 
 class Trainer:
     """Handles model training, validation, and visualization"""
@@ -52,7 +51,6 @@ class Trainer:
         self.val_loader = val_loader
         self.device = device
         
-        #self.criterion = ImprovedSimilarityLoss(weight=loss_weight)
         self.criterion = SimilarityLoss(weight=loss_weight)
         
         self.optimizer = optim.AdamW(
@@ -124,12 +122,14 @@ class Trainer:
             'val_losses': self.val_losses,
             'best_val_loss': self.best_val_loss
         }
+        # n_losses is the numebr of dims used in the loss function.
+        # i.e., len(COMPRESSED_DIMENSIONS)
 
-        tag = f"784_epoch_{epoch:03d}.pth"
+        tag = f"{inDim}_{outDim}_{n_losses}_ep_{epoch:03d}.pth"
 
         # Regular checkpoint
         if epoch % self.save_freq == 0:
-            path = self.checkpoint_dir / f'784_{epoch:03d}.pth'
+            path = self.checkpoint_dir / f'{inDim}_{outDim}_ep_{epoch:03d}.pth'
             torch.save(checkpoint, path)
             print(f"Saved checkpoint to {path}")
             
@@ -186,10 +186,14 @@ class Trainer:
 
 def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
+  
+    tag = "all_4"
+
+    train_loader = get_data(f"../generate_data/embeddings_data/{tag}_train.npy")
+    val_loader = get_data(f"../generate_data/embeddings_data/{tag}_val.npy")
     
-    train_loader = get_data("../generate_data/embeddings_data/all_three_train.npy")
-    val_loader = get_data("../generate_data/embeddings_data/all_three_val.npy")
-    
+    #train_loader = get_data("bge-arctic-train.npy")
+    #val_loader = get_data("bge-arctic-val.npy")
     model = EncoderOnly(EncoderConfig.DEFAULT)
     #model.apply(initialize_weights)
     
