@@ -187,10 +187,13 @@ class Trainer:
 def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
   
-    tag = "all_4"
+    tag = "e5-large-v2_wiki_500k"
 
-    train_loader = get_data(f"../generate_data/embeddings_data/{tag}_train.npy")
-    val_loader = get_data(f"../generate_data/embeddings_data/{tag}_val.npy")
+    #train_loader = get_data(f"../generate_data/embeddings_data/{tag}_train.npy")
+    #val_loader = get_data(f"../generate_data/embeddings_data/{tag}_val.npy")
+
+    train_loader = get_data(f"../generate_data/embeddings_data/{tag}/train_embeddings.npy")
+    val_loader = get_data(f"../generate_data/embeddings_data/{tag}/val_embeddings.npy")
     
     #train_loader = get_data("bge-arctic-train.npy")
     #val_loader = get_data("bge-arctic-val.npy")

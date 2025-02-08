@@ -13,7 +13,7 @@ NUM_WORKERS = 64
 TOKENIZERS_PARALLELISM = "false"
 
 BATCH_SIZE = 64
-NUM_EPOCHS = 30
+NUM_EPOCHS = 24
 
 # optimizer // scheduler ? why do you 
 LEARNING_RATE = 3e-4

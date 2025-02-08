@@ -31,7 +31,9 @@ models = {
             "bge-small"       : "BAAI/bge-small-en-v1.5", # (33M)
 }
 
-m_name = models["gist"] 
+m_name = models["mxbai"] 
+
+print("we are doing: ", m_name)
 
 split_dir = "split_indices"
 wiki_path = os.path.join(split_dir, "all_paragraphs.pkl")
@@ -91,7 +93,7 @@ train_data = embeddings[train_indices]
 val_data = embeddings[val_indices]
 
 # Save embeddings using compressed .npz format to save space
-save_dir = f"embeddings_data/nnew_{m_name}_wiki_500k"
+save_dir = f"embeddings_data/nnxew_{m_name}_wiki_500k"
 os.makedirs(save_dir, exist_ok=True)
 
 np.save(os.path.join(save_dir, "train_embeddings.npy"), train_data)

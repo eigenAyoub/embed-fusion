@@ -20,7 +20,7 @@ epochs=(32 64 128 384 512 768 784 812 1024)
 for ep in "${epochs[@]}"; do
 
     # Define arg2 based on the current epoch
-    arg2="1920-1024-trunc-${ep}-8MRL-ep-010"
+    arg2="1920-1024-trunc-${ep}-2MRL-ep-003"
 
     # Execute the Python script for different tasks
     python eval.py "$arg1" "$ep" all-4 NFCorpus 1 "$arg2"

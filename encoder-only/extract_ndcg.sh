@@ -24,7 +24,8 @@ TASK_NAME="$1"
 INSERT_NAME_BASE="$2"
 
 # Define the epochs you want to iterate over
-epochs=(01 02 03 04 05 06 07 08 09 10 12 14 16 18 20 25 28 30)
+#epochs=(01 02 03 04 05 06 07 08 09 10 12 14 16 18 20 25 28 30)
+epochs=(01 03 06 08 09 10 11 12)
 
 # Define a function to extract the desired metric using jq
 extract_metric() {

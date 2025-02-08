@@ -77,8 +77,9 @@ echo "--------------------------------------------"
 for val in "${values[@]}"; do
     # Construct the insert_name based on the current value
     # Desired format: 1920-1024-trunc-32-8MRL-ep-010
-    insert_name="${INSERT_NAME_BASE}-trunc-${val}-8MRL-ep-010"
+    #insert_name="${INSERT_NAME_BASE}-trunc-${val}-8MRL-ep-010"
     #insert_name="${INSERT_NAME_BASE}-trunc-${val}-4MRL-ep-003"
+    insert_name="${INSERT_NAME_BASE}-trunc-${val}-2MRL-ep-003"
 
     # Extract the ndcg_at_10 metric
     score=$(extract_metric "$insert_name" "$TASK_NAME" "ndcg_at_10")
