@@ -2,6 +2,38 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class Similarity(nn.Module):
+    """Loss that penalizes the worst mismatches based on pairwise cosine similarity errors."""
+    def __init__(self, weight: float = 1.0, k: int = 10):
+        super().__init__()
+        self.weight = weight
+        self.k = k
+
+    def forward(self, model_output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        # Compute pairwise cosine similarities
+        sim_outputs = nn.functional.cosine_similarity(
+            model_output.unsqueeze(1), model_output.unsqueeze(0), dim=-1
+        )
+        sim_targets = nn.functional.cosine_similarity(
+            targets.unsqueeze(1), targets.unsqueeze(0), dim=-1
+        )
+
+        # Mask out self-similarities (set diagonal to 0 so they don't contribute to error)
+        mask = torch.eye(sim_outputs.size(0), device=sim_outputs.device).bool()
+        sim_outputs = sim_outputs.masked_fill(mask, 0.0)
+        sim_targets = sim_targets.masked_fill(mask, 0.0)
+
+        # Compute the squared error between predictions and targets for every pair
+        error_matrix = (sim_outputs - sim_targets) ** 2
+
+        # Select the worst k errors per sample
+        worst_errors, _ = error_matrix.topk(self.k, dim=-1)
+
+        # Aggregate the worst errors
+        loss = worst_errors.mean()
+
+        return self.weight * loss
+
 
 class SimilarityLoss(nn.Module):
     """Loss based on cosine similarity between all pairs in batch"""
@@ -20,6 +52,29 @@ class SimilarityLoss(nn.Module):
         loss = torch.mean((sim_outputs - sim_targets) ** 2)
         return self.weight * loss
 
+
+class SimilarityLossTopK(nn.Module):
+    """Loss based on top-k cosine similarities between pairs in batch"""
+    def __init__(self, weight: float = 1.0, k: int = 10):
+        super().__init__()
+        self.weight = weight
+        self.k = k
+
+    def forward(self, model_output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        sim_outputs = nn.functional.cosine_similarity(model_output.unsqueeze(1), model_output.unsqueeze(0), dim=-1)
+        sim_targets = nn.functional.cosine_similarity(targets.unsqueeze(1), targets.unsqueeze(0), dim=-1)
+
+        mask = torch.eye(sim_outputs.size(0), device=sim_outputs.device).bool()
+        sim_outputs = sim_outputs.masked_fill(mask, -float('inf'))
+        sim_targets = sim_targets.masked_fill(mask, -float('inf'))
+        s = sim_outputs.shape[0]
+        if s < self.k :
+            self.k = 5
+        topk_values, topk_indices = sim_targets.topk(self.k, dim=-1)
+        topk_sim_outputs = sim_outputs.gather(1, topk_indices)
+        loss = torch.mean((topk_sim_outputs - topk_values) ** 2)
+        return self.weight * loss
+    
 class ImprovedSimilarityLoss(nn.Module):
     def __init__(self, weight: float = 1.0, margin: float = 0.1, temperature: float = 0.05):
         super().__init__()
@@ -44,27 +99,6 @@ class ImprovedSimilarityLoss(nn.Module):
         
         loss = (pos_loss.sum() + neg_loss.sum()) / (batch_size * (batch_size - 1))
         return self.weight * loss
-
-class SimilarityLossTopK(nn.Module):
-    """Loss based on top-k cosine similarities between pairs in batch"""
-    def __init__(self, weight: float = 1.0, k: int = 10):
-        super().__init__()
-        self.weight = weight
-        self.k = k
-
-    def forward(self, model_output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        sim_outputs = nn.functional.cosine_similarity(model_output.unsqueeze(1), model_output.unsqueeze(0), dim=-1)
-        sim_targets = nn.functional.cosine_similarity(targets.unsqueeze(1), targets.unsqueeze(0), dim=-1)
-
-        mask = torch.eye(sim_outputs.size(0), device=sim_outputs.device).bool()
-        sim_outputs = sim_outputs.masked_fill(mask, -float('inf'))
-        sim_targets = sim_targets.masked_fill(mask, -float('inf'))
-
-        topk_values, topk_indices = sim_targets.topk(self.k, dim=-1)
-        topk_sim_outputs = sim_outputs.gather(1, topk_indices)
-        loss = torch.mean((topk_sim_outputs - topk_values) ** 2)
-        return self.weight * loss
-    
 
 class ContrastiveInfoNCELoss(nn.Module):
     """

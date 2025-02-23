@@ -1,7 +1,0 @@
-/embeddings_data
-/data
-/model_pth
-/reconstructions
-__pycache__
-*.pth
-/test-01

@@ -92,7 +92,7 @@ class AdaptiveSentenceTransformer(Encoder):
 
     def encode(self, sentences: Union[str, List[str]], **kwargs):
         self.call_count += 1
-        print(f"> Embedding model called with kwargs: {kwargs}")
+        #print(f"> Embedding model called with kwargs: {kwargs}")
         embeddings_list = []
 
         # Remove NFCorpus prompt if present
@@ -104,64 +104,71 @@ class AdaptiveSentenceTransformer(Encoder):
         for model, model_key in zip(self.models, self.model_keys):
             model_kwargs = local_kwargs.copy()
             model_kwargs["normalize_embeddings"]=False
-            print(">> model_kwargs[ normalize_embeddings ] = ", model_kwargs["normalize_embeddings"])
+            #print(">> model_kwargs[ normalize_embeddings ] = ", model_kwargs["normalize_embeddings"])
 
             if "snowflake" in model_key:
                 if self.call_count == 1:
-                    print(f"## Updating {model_key} `model_kwargs` ## Setting `prompt_name=PromptType.query`")
+                    #print(f"## Updating {model_key} `model_kwargs` ## Setting `prompt_name=PromptType.query`")
                     model_kwargs['prompt_name'] = PromptType.query
-                    print(f"## Updated kwargs for {model_key}: {model_kwargs}")
+                    #print(f"## Updated kwargs for {model_key}: {model_kwargs}")
                 elif 'prompt_name' in model_kwargs:
                     del model_kwargs['prompt_name']
                     
-            print(f">> model.encode(.) #Number {self.call_count} for {model_key} with kwargs: {model_kwargs}")
+            #print(f">> model.encode(.) #Number {self.call_count} for {model_key} with kwargs: {model_kwargs}")
             embeddings = model.encode(sentences, **model_kwargs)
             
             if isinstance(embeddings, torch.Tensor):
-                print(f"Model {model_key} output tensor shape: {embeddings.shape}")
+                pass
+                #print(f">> Model {model_key} returned torch.Tensor of shape tensor shape: {embeddings.shape}")
             elif isinstance(embeddings, np.ndarray):
-                print(f"Model {model_key} output array shape: {embeddings.shape}")
-                
+                #print(f">> Model {model_key} returned np.ndarray of shape: {embeddings.shape}, will convert to torch.Tensor")
+                embeddings = torch.Tensor(embeddings) 
+
             embeddings_list.append(embeddings)
 
         if self.single_model :
-            print(f">>> Operating on a single model, len is {len(embeddings_list)}")
+            #print(f">>> Operating on a single model, len is {len(embeddings_list)}")
             if hasattr(self, 'encoder'):
+                print(">>> Single: Yes encoder")
                 encoded = self.encoder(embeddings_list[0].to(self.device), 
                                     dim=self.truncate)
-                print(f">>> Returning the encoder tensor shape: {encoded.shape}")
+                print(f">>> Single: Returning the encoder tensor shape: {encoded.shape}")
                 return encoded
             else:
-                print(">>> Are we truncating this simple model? to what degree", self.truncate)
-                #print(">>> with these rands ", rand_indices)
+                #print(">>> Are we truncating this simple model? to what degree", self.truncate)
+                ##print(">>> with these rands ", rand_indices)
                 #encoded = embeddings_list[0][:,rand_indices]
                 encoded = embeddings_list[0][:,:self.truncate]
-                print(">>> Returning tensor with size > ", encoded.shape)
+                #print(">>> Returning tensor with size > ", encoded.shape)
                 return encoded
         else:
             if all(isinstance(e, torch.Tensor) for e in embeddings_list):
+                #print("All indices are torch.Tensor")
                 concat = torch.cat(embeddings_list, dim=1)
                 concat = F.normalize(concat, p=2, dim=1)
                 # TODO: check this ASAP
                 # do you normalize the embeddings? when you concat them?
-                print(f">>> Concatenated tensor shape, it is normalized per column as well {concat.shape}")
+                #print(f">>> Concatenated tensor shape, it is normalized per column as well {concat.shape}")
                 if hasattr(self, 'encoder'):
-#                    encoded = self.encoder(concat.to(self.device), 
+                    print("> yes encoder")
+#                   encoded = self.encoder(concat.to(self.device), 
 #                                        dim=self.truncate)
                     encoded = self.encoder(concat.to(self.device), 
                                         dim=self.truncate)
-                    print(f">>> Returning the encoder tensor shape: {encoded.shape}")
+                    #print(f">>> Returning the encoder tensor shape: {encoded.shape}")
                     if hasattr(self, 'quantizer'):
                         print(">> we are using the quant")
-                        print(">> orig > ", encoded[0][:100])
+                        #print(">> orig > ", encoded[0])
                         q_encoded = self.quantizer.quantize(encoded)
                         # Dequantize using the lookup table.
-                        print(">> quant > ", q_encoded[0][:100])
-                        deq_encoded = self.quantizer.dequantize(q_encoded)
-                        print(">> de-quant > ", deq_encoded[0][:100])
+                        #print(">> returning this quant > ", q_encoded[0])
+                        #deq_encoded = self.quantizer.dequantize(q_encoded)
+                        #print(">> de-quant > ", deq_encoded[0][:100])
                         #deq_trunc = deq_encoded[:,:384]
-                        print("returning this size ", deq_encoded.shape)
-                        return deq_encoded 
+                        print("returning this size ", q_encoded.shape)
+                        #return deq_encoded 
+                        return q_encoded 
+                    print("> no quant, returning ", encoded.shape)
                     return encoded
                 else:
                     print(f"Concat with No encoder, input shape now: ", concat.shape, type(concat))

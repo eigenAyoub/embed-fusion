@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 from data_loader import get_data
-from loss import SimilarityLoss 
+from loss import SimilarityLoss, SimilarityLossTopK, Similarity
 
 from encoder_simple import EncoderOnly, EncoderConfig, COMPRESSED_DIMENSIONS
 from config import (
@@ -51,7 +51,7 @@ class Trainer:
         self.val_loader = val_loader
         self.device = device
         
-        self.criterion = SimilarityLoss(weight=loss_weight)
+        self.criterion = Similarity(weight=1.0, k=10)
         
         self.optimizer = optim.AdamW(
             model.parameters(),
@@ -83,9 +83,9 @@ class Trainer:
         for batch in self.train_loader:
             inputs = batch.to(self.device)
             self.optimizer.zero_grad()
-            
+           
             loss = sum(
-                self.criterion(self.model(inputs, dim), inputs)  # Use self.criterion
+                self.criterion(self.model(inputs, dim), inputs)  
                 for dim in COMPRESSED_DIMENSIONS
             )
             
@@ -125,11 +125,11 @@ class Trainer:
         # n_losses is the numebr of dims used in the loss function.
         # i.e., len(COMPRESSED_DIMENSIONS)
 
-        tag = f"{inDim}_{outDim}_{n_losses}_ep_{epoch:03d}.pth"
+        tag = f"f{inDim}_{outDim}_{n_losses}_ep_{epoch:03d}.pth"
 
         # Regular checkpoint
         if epoch % self.save_freq == 0:
-            path = self.checkpoint_dir / f'{inDim}_{outDim}_ep_{epoch:03d}.pth'
+            path = self.checkpoint_dir / f'f{inDim}_{outDim}_ep_{epoch:03d}.pth'
             torch.save(checkpoint, path)
             print(f"Saved checkpoint to {path}")
             
@@ -142,6 +142,14 @@ class Trainer:
     def train(self, num_epochs: int = NUM_EPOCHS):
         """Main training loop with checkpoint saving"""
         for epoch in range(num_epochs):
+
+            #if epoch == 5 :
+            #    print("Changing critereon to top k = 20")
+            #    self.criterion = SimilarityLossTopK(weight=1.0, k = 30)
+            #if epoch == 12 :
+            #    print("Changing critereon to top k = 20")
+            #    self.criterion = SimilarityLossTopK(weight=1.0, k = 20)
+
             train_loss = self.train_epoch()
             val_loss = self.validate()
             self.scheduler.step()
@@ -187,7 +195,10 @@ class Trainer:
 def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
   
-    tag = "e5-large-v2_wiki_500k"
+    #tag = "e5-large-v2_wiki_500k"
+    #tag = "all_4"
+
+    tag = "snowflake-m"
 
     #train_loader = get_data(f"../generate_data/embeddings_data/{tag}_train.npy")
     #val_loader = get_data(f"../generate_data/embeddings_data/{tag}_val.npy")
@@ -198,7 +209,6 @@ def main():
     #train_loader = get_data("bge-arctic-train.npy")
     #val_loader = get_data("bge-arctic-val.npy")
     model = EncoderOnly(EncoderConfig.DEFAULT)
-    #model.apply(initialize_weights)
     
     trainer = Trainer(
         model, 
