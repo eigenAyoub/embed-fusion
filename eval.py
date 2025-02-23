@@ -4,7 +4,7 @@ from typing import List, Union, Dict, Any, Optional
 
 from mteb.encoder_interface import Encoder, PromptType
 
-from encoder_simple import EncoderOnly, EncoderConfig
+from model import EncoderOnly, EncoderConfig
 from offline_quant import PerColumnQuantizer
 
 import torch
@@ -13,10 +13,6 @@ import numpy as np
 
 import sys
 
-model_config = EncoderConfig.DEFAULT
-
-inDim = model_config["input_dim"]
-outDim = model_config["output_dim"]
 
 #rand_indices = torch.sort(torch.randperm(1920)[:384]).values
 #print("We are going to take these indices ", rand_indices)
@@ -42,10 +38,11 @@ class AdaptiveSentenceTransformer(Encoder):
                  models: List[Union[str, SentenceTransformer]], 
                  device: str = 'cuda',
                  checkpoint_path: Optional[str] = None,
-                 quantizer_path: Optional[str] = None,
+                 quantizer_path:  Optional[str]  = None,
                  input_dim:       Optional[int] = None, 
                  compressed_dim:  Optional[int] = None,
                  truncate:        Optional[int] = None,
+                 
                 ):
 
         self.device = device
@@ -54,6 +51,7 @@ class AdaptiveSentenceTransformer(Encoder):
         self.call_count = 0
         self.first_call_done = False
         self.truncate = truncate
+
 
         for model_info in models:
             if isinstance(model_info, str):
@@ -74,8 +72,14 @@ class AdaptiveSentenceTransformer(Encoder):
         self.single_model = (len(self.models) == 1)
 
         if checkpoint_path and input_dim and compressed_dim:
-            print("Initializing encoder with provided parameters")
-            self.encoder = EncoderOnly(EncoderConfig.DEFAULT).to(device)
+
+            model_config = {
+                "input_dim" : input_dim,
+                "output_dim": compressed_dim,
+            }
+
+            print("Initializing encoder with {inDim} to {outDim}")
+            self.encoder = EncoderOnly(model_config).to(device)
             self.encoder.load_state_dict(torch.load(checkpoint_path)["model_state_dict"])
             print(">> Training mode > ", self.encoder.training)
             self.encoder.eval()
@@ -221,17 +225,32 @@ def main():
         print("model_type: bge-small, snowflake-m, or combined")
         sys.exit(1)
         
-    ckpt = sys.argv[1] 
-    trunc = int(sys.argv[2]) 
-    model_type = sys.argv[3] # `combined` oder `model_name` (single model)
-    tsk  = sys.argv[4]
+    ckpt        = sys.argv[1] 
+    trunc       = int(sys.argv[2]) 
+    model_type  = sys.argv[3] # `combined` oder `model_name` (single model)
+    tsk         = sys.argv[4]
     use_encoder = bool(int(sys.argv[5])) if len(sys.argv) > 5 else False
-    random_tag = sys.argv[6] 
-    my_quant = sys.argv[7] 
-    use_quant = len(sys.argv[7])>1
-    
+    random_tag  = sys.argv[6] 
+    my_quant    = sys.argv[7] 
+    use_quant   = len(sys.argv[7])>1
+
+
+
     print("Are you using a quant > ", use_quant) 
+
     if use_encoder:
+        inDim = 0
+        outDim = 0
+        log_file = "logs.txt"
+        run_id = 123452
+        with open(log_file, "r") as f:
+            for line in f:
+                parts = line.strip().split()
+                if parts[1] == run_id:
+                    inDim = int(parts[2])
+                    outDim = int(parts[3])
+                    break
+
         print(f"Reading checkpoint from: models_pth/{inDim}_{outDim}/{ckpt}.pth")
 
     # Configure model based on type
@@ -270,8 +289,8 @@ def main():
             models=model_keys,
             device="cuda",
             checkpoint_path=f"models_pth/{inDim}_{outDim}/{ckpt}.pth" if use_encoder else None,
-            input_dim=1152 if use_encoder else None,
-            compressed_dim=33 if use_encoder else None,
+            input_dim= inDim if use_encoder else None,
+            compressed_dim= outDim if use_encoder else None,
             truncate=trunc if use_encoder else None,
             quantizer_path=my_quant if use_quant else None
         )
@@ -297,8 +316,6 @@ def main():
             print("there we go")
             output_folder = f"results/{random_tag}"
     
-    # Setup evaluation
-    #tasks = mteb.get_tasks(tasks=["NFCorpus", "SciFact", "ArguAna"])
 
     tasks = mteb.get_tasks(tasks=[tsk])
 

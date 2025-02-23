@@ -2,32 +2,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class EncoderConfig:
-    DEFAULT = {
-        'input_dim':  768,
-        'output_dim': 256,
-        'dropout': 0.1
-    }
+enc_config = {
+    'input_dim':  768,
+    'output_dim': 256,
+}
 
-outDim = EncoderConfig.DEFAULT["output_dim"]
-
-#COMPRESSED_DIMENSIONS = [64, outDim]   # low MRL  for 384
-#COMPRESSED_DIMENSIONS = [64, 128, 256, 384, outDim]   
-#COMPRESSED_DIMENSIONS = [32, 64, 128, 205, outDim] # high MRL
-#COMPRESSED_DIMENSIONS = [32, 64, 80, 100, 120, 150, 160, 175, 180, 205, 256, 384, outDim]   # low MRL  for 384
-#COMPRESSED_DIMENSIONS = [205, 256, 512, outDim]  # mid MRL
-
-#COMPRESSED_DIMENSIONS = [100, 120, 130, 140, 154, 256, 300, 320, 350, 384, 512, outDim]   # low MRL  for 384
+outDim = enc_config["output_dim"]
 
 COMPRESSED_DIMENSIONS = [64, 256, outDim]   
 
 class EncoderOnly(nn.Module):
-    def __init__(self, config: dict = None):
+    def __init__(self, cfg: dict = None):
         super().__init__()
-        cfg = config or EncoderConfig.DEFAULT
         
         self.encoder = nn.Sequential(
-            #nn.LayerNorm(cfg['input_dim']),
+            nn.LayerNorm(cfg['input_dim']),
             nn.Linear(cfg['input_dim'], cfg['output_dim']),
             nn.BatchNorm1d(cfg['output_dim']),
             nn.LeakyReLU(0.2, inplace=True),
@@ -50,14 +39,3 @@ class EncoderOnly(nn.Module):
         out = self.encoder(x)
         # L2 normalize output embeddings
         return F.normalize(out[:,:dim], p=2, dim=1)
-    
-    
-# OG
-#self.encoder = nn.Sequential(
-#    nn.LayerNorm(cfg['input_dim']),
-#    nn.Linear(cfg['input_dim'], cfg['output_dim']),
-#    nn.BatchNorm1d(cfg['output_dim']),
-#    nn.LeakyReLU(0.2, inplace=True),
-#    
-#    nn.LayerNorm(cfg['output_dim']),
-#)

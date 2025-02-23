@@ -1,5 +1,7 @@
 from pathlib import Path
 from typing import List, Dict, Optional
+
+import datetime
 import os
 import torch
 import torch.nn as nn
@@ -8,9 +10,11 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 from data_loader import get_data
+
 from loss import SimilarityLoss, SimilarityLossTopK, Similarity
 
-from encoder_simple import EncoderOnly, EncoderConfig, COMPRESSED_DIMENSIONS
+from model import EncoderOnly 
+
 from config import (
     DEVICE,
     LEARNING_RATE,
@@ -18,16 +22,8 @@ from config import (
     STEP_SIZE,
     GAMMA,
     NUM_EPOCHS,
-    PLOT_PATH,
 )
 
-model_config = EncoderConfig.DEFAULT
-
-inDim = model_config["input_dim"]
-outDim = model_config["output_dim"]
-n_losses = len(COMPRESSED_DIMENSIONS)
-
-print("We are using the following dims for the MRL loss: ", COMPRESSED_DIMENSIONS)
 
 class Trainer:
     """Handles model training, validation, and visualization"""
@@ -36,6 +32,9 @@ class Trainer:
         model: nn.Module,
         train_loader: DataLoader,
         val_loader: DataLoader,
+        enc_config: Dict, # in / out
+        dims,             # mrl dims
+        now: str,         # checkpoints tag
         device: str = DEVICE,
         learning_rate: float = LEARNING_RATE,
         weight_decay: float = WEIGHT_DECAY,
@@ -43,15 +42,17 @@ class Trainer:
         use_topk: bool = False,
         k: int = 10,
         checkpoint_dir: str = "checkpoints",
-        save_freq: int = 5,  # Save every N epochs
-
+        save_freq: int = 5,  # Save every N iepochs
     ):
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.device = device
+        self.enc_config = enc_config
+        self.now = now 
+        self.mrl_dims = dims
         
-        self.criterion = Similarity(weight=1.0, k=10)
+        self.criterion = SimilarityLoss(weight=1.0)
         
         self.optimizer = optim.AdamW(
             model.parameters(),
@@ -86,7 +87,7 @@ class Trainer:
            
             loss = sum(
                 self.criterion(self.model(inputs, dim), inputs)  
-                for dim in COMPRESSED_DIMENSIONS
+                for dim in self.mrl_dims
             )
             
             loss.backward()
@@ -105,7 +106,7 @@ class Trainer:
                 inputs = batch.to(self.device)
                 loss = sum(
                     self.criterion(self.model(inputs, dim), inputs)  # Use self.criterion
-                    for dim in COMPRESSED_DIMENSIONS
+                    for dim in self.mrl_dims 
                 )
                 running_loss += loss.item()
                 
@@ -122,33 +123,25 @@ class Trainer:
             'val_losses': self.val_losses,
             'best_val_loss': self.best_val_loss
         }
-        # n_losses is the numebr of dims used in the loss function.
-        # i.e., len(COMPRESSED_DIMENSIONS)
-
-        tag = f"f{inDim}_{outDim}_{n_losses}_ep_{epoch:03d}.pth"
+        
+        inDim  = self.enc_config["input_dim"]
+        outDim = self.enc_config["output_dim"]
 
         # Regular checkpoint
         if epoch % self.save_freq == 0:
-            path = self.checkpoint_dir / f'f{inDim}_{outDim}_ep_{epoch:03d}.pth'
+            path = self.checkpoint_dir /      f'{inDim}_{outDim}_ep_{epoch:03d}_{self.now}.pth'
             torch.save(checkpoint, path)
             print(f"Saved checkpoint to {path}")
             
         # Best model checkpoint
         if is_best:
-            best_path = self.checkpoint_dir / tag 
+            best_path = self.checkpoint_dir / f"{inDim}_{outDim}_ep_{epoch:03d}_{self.now}.pth"
             torch.save(checkpoint, best_path)
             print(f"Saved best model to {best_path}")
 
     def train(self, num_epochs: int = NUM_EPOCHS):
         """Main training loop with checkpoint saving"""
         for epoch in range(num_epochs):
-
-            #if epoch == 5 :
-            #    print("Changing critereon to top k = 20")
-            #    self.criterion = SimilarityLossTopK(weight=1.0, k = 30)
-            #if epoch == 12 :
-            #    print("Changing critereon to top k = 20")
-            #    self.criterion = SimilarityLossTopK(weight=1.0, k = 20)
 
             train_loss = self.train_epoch()
             val_loss = self.validate()
@@ -168,57 +161,44 @@ class Trainer:
             
             self.save_checkpoint(epoch + 1, is_best, val_loss)
             
-        self.plot_losses()
-
-    def plot_losses(self):
-        """Plot training history"""
-        plt.figure(figsize=(14, 6))
-        
-        plt.subplot(1, 2, 1)
-        plt.plot(self.train_losses, label='Train Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Training Loss')
-        plt.legend()
-        
-        plt.subplot(1, 2, 2)
-        plt.plot(self.val_losses, label='Validation Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.title('Validation Loss')
-        plt.legend()
-        
-        plt.tight_layout()
-        plt.savefig(PLOT_PATH)
-        plt.close()
 
 def main():
-    os.environ["TOKENIZERS_PARALLELISM"] = "false"
   
-    #tag = "e5-large-v2_wiki_500k"
-    #tag = "all_4"
-
-    tag = "snowflake-m"
-
-    #train_loader = get_data(f"../generate_data/embeddings_data/{tag}_train.npy")
-    #val_loader = get_data(f"../generate_data/embeddings_data/{tag}_val.npy")
-
-    train_loader = get_data(f"../generate_data/embeddings_data/{tag}/train_embeddings.npy")
-    val_loader = get_data(f"../generate_data/embeddings_data/{tag}/val_embeddings.npy")
+    tag = "all_4"
     
-    #train_loader = get_data("bge-arctic-train.npy")
-    #val_loader = get_data("bge-arctic-val.npy")
-    model = EncoderOnly(EncoderConfig.DEFAULT)
+    train_loader = get_data(f"generate_data/embeddings_data/{tag}/train_embeddings.npy")
+    val_loader = get_data(f"generate_data/embeddings_data/{tag}/val_embeddings.npy")
     
+    model_config = {
+                    'input_dim':  1920,
+                    'output_dim': 1024,
+                }
+
+    inDim = model_config["input_dim"]
+    outDim = model_config["output_dim"]
+    COMPRESSED_DIMENSIONS = [32, 64, 128, 256, 384, 512, 768, 1024, outDim]
+    
+    model = EncoderOnly(model_config)
+    
+    now = datetime.datetime.now().strftime("%H%M%S")
+    
+    log_line = f"run {now} {inDim} {outDim} {COMPRESSED_DIMENSIONS} Obs\n"
+    with open("logs.txt", "a") as f:
+        f.write(log_line)
+
     trainer = Trainer(
         model, 
         train_loader, 
         val_loader,
         checkpoint_dir=f"models_pth/{inDim}_{outDim}",
+        enc_config=model_config,
+        now = now,
+        dims = COMPRESSED_DIMENSIONS,
         save_freq=5
     )
-    trainer.train()
 
+
+    trainer.train()
 
 if __name__ == "__main__":
     main()
