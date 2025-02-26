@@ -4,7 +4,7 @@ from typing import List, Union, Dict, Any, Optional
 
 from mteb.encoder_interface import Encoder, PromptType
 
-from model import EncoderOnly, EncoderConfig
+from model import EncoderOnly 
 from offline_quant import PerColumnQuantizer
 
 import torch
@@ -12,11 +12,18 @@ import torch.nn.functional as F
 import numpy as np
 
 import sys
+import random
 
+seed = 37  # You can choose any integer
+torch.manual_seed(seed)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(seed)
+
+np.random.seed(seed)
+random.seed(seed)
 
 #rand_indices = torch.sort(torch.randperm(1920)[:384]).values
 #print("We are going to take these indices ", rand_indices)
-#print("Main, we are going to take these indices ", len(rand_indices))
 
 class AdaptiveSentenceTransformer(Encoder):
     MODEL_CATALOGUE: Dict[str, str] = {
@@ -128,6 +135,11 @@ class AdaptiveSentenceTransformer(Encoder):
                 #print(f">> Model {model_key} returned np.ndarray of shape: {embeddings.shape}, will convert to torch.Tensor")
                 embeddings = torch.Tensor(embeddings) 
 
+            # Kanishka --
+            if "snowflake" in model_key:
+                print(embeddings.shape, type(embeddings))
+                embeddings = embeddings[:,:256]
+
             embeddings_list.append(embeddings)
 
         if self.single_model :
@@ -154,14 +166,13 @@ class AdaptiveSentenceTransformer(Encoder):
                 # do you normalize the embeddings? when you concat them?
                 #print(f">>> Concatenated tensor shape, it is normalized per column as well {concat.shape}")
                 if hasattr(self, 'encoder'):
-                    print("> yes encoder")
-#                   encoded = self.encoder(concat.to(self.device), 
-#                                        dim=self.truncate)
+                    print("> Using encoder:")
                     encoded = self.encoder(concat.to(self.device), 
                                         dim=self.truncate)
-                    #print(f">>> Returning the encoder tensor shape: {encoded.shape}")
+                    print(f">>> Returning the encoder tensor shape: {encoded.shape}")
+                    
                     if hasattr(self, 'quantizer'):
-                        print(">> we are using the quant")
+                        print("> Using quantizer:")
                         #print(">> orig > ", encoded[0])
                         q_encoded = self.quantizer.quantize(encoded)
                         # Dequantize using the lookup table.
@@ -173,12 +184,12 @@ class AdaptiveSentenceTransformer(Encoder):
                         #return deq_encoded 
                         return q_encoded 
                     print("> no quant, returning ", encoded.shape)
-                    return encoded
+                    #encoded = encoded[:,-384:]
+                    print("> Returning the last 384 features", encoded.shape)
+                    return encoded 
                 else:
                     print(f"Concat with No encoder, input shape now: ", concat.shape, type(concat))
-                    #print(f"About to randomly sample {outDim} features, {rand_indices}") 
                     #concat = concat[:,rand_indices] 
-                    #print(f"returned shape after concat then random sampling ", concat.shape)
                     return concat 
 
             elif all(isinstance(e, np.ndarray) for e in embeddings_list):
@@ -220,7 +231,7 @@ def evaluate_model(
     
 def main():
     if len(sys.argv) < 4:
-        print("Usage:   python eval.py <checkpoint> <truncate>  <model_type>")
+        print("Usage:   python eval.py <checkpoint> <truncate>  <model_type>   ")
         print("Example: python eval.py <checkpoint> <truncate>  <model_type>")
         print("model_type: bge-small, snowflake-m, or combined")
         sys.exit(1)
@@ -235,14 +246,17 @@ def main():
     use_quant   = len(sys.argv[7])>1
 
 
+    run_id = random_tag.split("-")[0]
+    
+    print("> run in is: ", run_id)
+    print("> Are you using a decoder: ", use_encoder) 
+    print("> Are you using a quant: ", use_quant) 
 
-    print("Are you using a quant > ", use_quant) 
+    inDim = 0
+    outDim = 0
 
     if use_encoder:
-        inDim = 0
-        outDim = 0
         log_file = "logs.txt"
-        run_id = 123452
         with open(log_file, "r") as f:
             for line in f:
                 parts = line.strip().split()
@@ -251,7 +265,7 @@ def main():
                     outDim = int(parts[3])
                     break
 
-        print(f"Reading checkpoint from: models_pth/{inDim}_{outDim}/{ckpt}.pth")
+    print(f"> Reading checkpoint from: models_pth/{inDim}_{outDim}/{ckpt}.pth")
 
     # Configure model based on type
     if model_type == "combined":
@@ -285,12 +299,14 @@ def main():
     elif model_type == "all-4":
         model_keys = ["bge-small", "e5-small", "gist", "snowflake-m"]
         print("Are we using an encoder with 4 models", use_encoder)
+        checkp="models_pth/{inDim}_{outDim}/{ckpt}.pth" if use_encoder else None,
+        print(checkp)
         model = AdaptiveSentenceTransformer(
             models=model_keys,
             device="cuda",
             checkpoint_path=f"models_pth/{inDim}_{outDim}/{ckpt}.pth" if use_encoder else None,
-            input_dim= inDim if use_encoder else None,
-            compressed_dim= outDim if use_encoder else None,
+            input_dim = inDim if use_encoder else None,
+            compressed_dim = outDim if use_encoder else None,
             truncate=trunc if use_encoder else None,
             quantizer_path=my_quant if use_quant else None
         )

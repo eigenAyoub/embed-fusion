@@ -24,6 +24,14 @@ from config import (
     NUM_EPOCHS,
 )
 
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+NUM_EPOCHS = 20
+LEARNING_RATE = 3e-4
+WEIGHT_DECAY  = 1e-5
+STEP_SIZE = 4
+GAMMA = 0.1
+PATIENCE = 5
+
 
 class Trainer:
     """Handles model training, validation, and visualization"""
@@ -171,12 +179,12 @@ def main():
     
     model_config = {
                     'input_dim':  1920,
-                    'output_dim': 1024,
+                    'output_dim': 768,
                 }
 
     inDim = model_config["input_dim"]
     outDim = model_config["output_dim"]
-    COMPRESSED_DIMENSIONS = [32, 64, 128, 256, 384, 512, 768, 1024, outDim]
+    COMPRESSED_DIMENSIONS = [50, 60, 70, 80, 100, 120, 150, 200, 250, 320, 350, 384, outDim]
     
     model = EncoderOnly(model_config)
     

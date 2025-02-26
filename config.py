@@ -3,21 +3,16 @@
 import os
 import torch
 
-# Device configuration
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 PLOT_PATH= f"loss_curve.pth"
-
-# can we optimmize this? why 64 work worse? where do you even need it?
 NUM_WORKERS = 64 
 TOKENIZERS_PARALLELISM = "false"
 
 BATCH_SIZE = 64
 NUM_EPOCHS = 20
 
-# optimizer // scheduler ? why do you 
 LEARNING_RATE = 3e-4
-WEIGHT_DECAY  = 0
+WEIGHT_DECAY  = 0.01
 
 STEP_SIZE = 4
 GAMMA = 0.1
@@ -28,20 +23,6 @@ LOSS_WEIGHTS = {
     64: 2,    # Highest priority
     128: 1.5,   # High priority
     256: 1.0,   # Medium priority
-}
-
-MODEL_CATALOGUE = {
-            "mxbai"           : "mixedbread-ai/mxbai-embed-large-v1",
-            "bge"             : "BAAI/bge-large-en-v1.5",
-            "e5"              : "intfloat/e5-large-v2"  ,
-            "snowflake"       : "Snowflake/snowflake-arctic-embed-m",
-            "snowflake-l"     : "Snowflake/snowflake-arctic-embed-l",
-            "gte-base"        : "thenlper/gte-base",
-            "gte-large"       : "thenlper/gte-large",
-            "gte-small"       : "thenlper/gte-small",
-            "e5-small"        : "intfloat/e5-small-v2", # (33M)
-            "bge-small"       : "BAAI/bge-small-en-v1.5", # (33M)
-            "jina-v3"         : "jinaai/jina-embeddings-v3"
 }
 
 
