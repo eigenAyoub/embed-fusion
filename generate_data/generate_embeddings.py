@@ -14,6 +14,8 @@ from eval import AdaptiveSentenceTransformer
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 model_key = "mxbai"
+print(f"Generating for {model_key}")
+
 split_dir = "split_indices"
 wiki_path = os.path.join(split_dir, "all_paragraphs.pkl")
 
@@ -26,6 +28,7 @@ with open(wiki_path, 'rb') as f:
 
 
 num_samples = len(all_paragraphs)
+
 
 print(f"Train set size: {len(train_indices)}")
 print(f"Validation set size: {len(val_indices)}")
@@ -45,27 +48,31 @@ model = AdaptiveSentenceTransformer(
 
 embeddings = []
 
-batch_size = 512 
+batch_size = 1024 
+
 num_batches = (len(all_paragraphs) + batch_size - 1) // batch_size
 
-for i in tqdm(range(num_batches), desc="Generating Embeddings"):
-    start_idx = i * batch_size
-    end_idx = min((i + 1) * batch_size, len(all_paragraphs))
-    batch_texts = all_paragraphs[start_idx:end_idx]
+with torch.inference_mode():
+    for i in tqdm(range(num_batches), desc="Generating Embeddings"):
+        start_idx = i * batch_size
+        end_idx = min((i + 1) * batch_size, len(all_paragraphs))
+        batch_texts = all_paragraphs[start_idx:end_idx]
 
-    batch_embeddings = model.encode(
-        batch_texts,
-        batch_size=batch_size,
-        show_progress_bar=False,
-        normalize_embeddings=False,
-        convert_to_numpy=True,
-        max_length = 512,
-        device="cuda"
-    )
-
-    embeddings.append(batch_embeddings)
+        batch_embeddings = model.encode(
+            batch_texts,
+            batch_size=batch_size,
+            show_progress_bar=False,
+            normalize_embeddings=False,
+            convert_to_numpy=False,
+            max_length = 512,
+            device="cuda"
+        )
+            
+        embeddings.append(batch_embeddings.cpu().numpy())
+        del batch_embeddings
+        torch.cuda.empty_cache()
     
-embeddings = np.vstack(embeddings)
+embeddings = np.concatenate(embeddings, axis=0)
 
 print(f"Embeddings shape: {embeddings.shape}")
 
@@ -80,4 +87,3 @@ np.save(os.path.join(save_dir, "val_embeddings.npy"),   val_data)
 
 print(f"Train embeddings saved to:      {save_dir}/train_embeddings.npy")
 print(f"Validation embeddings saved to: {save_dir}/val_embeddings.npy")
-
