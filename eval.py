@@ -15,6 +15,7 @@ import numpy as np
 import sys
 import random
 
+from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModel  # Hugging Face
 
 # Set seeds
@@ -42,7 +43,8 @@ class AdaptiveSentenceTransformer(Encoder):
         "e5-small": "intfloat/e5-small-v2",
         "bge-small": "BAAI/bge-small-en-v1.5",
         "gist": "avsolatorio/GIST-small-Embedding-v0",
-        "linq": "Linq-AI-Research/Linq-Embed-Mistral"
+        "linq": "Linq-AI-Research/Linq-Embed-Mistral",
+        "no-ins": "avsolatorio/NoInstruct-small-Embedding-v0"
     }
 
     def __init__(self,
@@ -72,10 +74,15 @@ class AdaptiveSentenceTransformer(Encoder):
                     tokenizer = AutoTokenizer.from_pretrained(model_path)
                     model = AutoModel.from_pretrained(model_path).to(device)
                     MODEL_CACHE[model_path] = (model, tokenizer)
+                elif model_key == "no-ins":
+                    tokenizer = AutoTokenizer.from_pretrained(model_path)
+                    model = AutoModel.from_pretrained(model_path).to(device)
+                    MODEL_CACHE[model_path] = (model, tokenizer)
                 else:
                     model = SentenceTransformer(model_path, trust_remote_code=True).to(device)
                     MODEL_CACHE[model_path] = (model, None)
 
+            model.eval()
             model, tokenizer = MODEL_CACHE[model_path]
             self.models.append(model)
             self.tokenizers.append(tokenizer)
@@ -102,22 +109,19 @@ class AdaptiveSentenceTransformer(Encoder):
     def _hf_encode(self, model: AutoModel, 
                    tokenizer: AutoTokenizer, 
                    sentences: Union[str, List[str]],
-                   prompt_name: Optional[str] = None, **kwargs) -> torch.Tensor:
+                   **kwargs) -> torch.Tensor:
         
         if isinstance(sentences, str):
             sentences = [sentences]
         
-        print("fuck you")
-        prompt_name = kwargs["prompt_type"]
-        print(kwargs)
-        print(prompt_name)
+        prompt_name = kwargs.get("prompt_type", None)
 
         if prompt_name == PromptType.query:
             prompted_sentences = [f"query: {s}" for s in sentences]
         elif prompt_name == PromptType.passage:
             prompted_sentences = [f"passage: {s}" for s in sentences]
         else:  # Default to "query: " if no prompt is provided
-            prompted_sentences = [f"query: {s}" for s in sentences]
+            prompted_sentences = [f"passage: {s}" for s in sentences]
 
         batch_dict = tokenizer(prompted_sentences, max_length=512, padding=True, truncation=True, return_tensors='pt').to(self.device)
         with torch.no_grad():  # Disable gradient calculation
@@ -129,44 +133,96 @@ class AdaptiveSentenceTransformer(Encoder):
     def average_pool(self, last_hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
         return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+   
+    def _noins_encode(self,
+                    model: AutoModel,
+                    tokenizer: AutoTokenizer,
+                    sentences: Union[str, List[str]],
+                    **kwargs) -> torch.Tensor:
+        """
+        Custom encoding for the no-ins model.
+        For queries, this function applies mean pooling (weighted by the attention mask).
+        For sentences/documents, it uses the [CLS] token representation.
+        """
+        # Ensure sentences is a list
+        if isinstance(sentences, str):
+            sentences = [sentences]
+        
+        prompt_name = kwargs.get("prompt_type", None)
+
+        mode = "query" if prompt_name == PromptType.query else "sentence"
+        
+        inp = tokenizer(sentences, return_tensors="pt", padding=True, truncation=True).to(self.device)
+        
+        with torch.no_grad():
+            output = model(**inp)
+        
+        if mode == "query":
+            vectors = output.last_hidden_state * inp["attention_mask"].unsqueeze(2)
+            vectors = vectors.sum(dim=1) / inp["attention_mask"].sum(dim=-1).view(-1, 1)
+        else:
+            vectors = output.last_hidden_state[:, 0, :]
+        
+        vectors = F.normalize(vectors, p=2, dim=1)
+        return vectors
 
     def encode(self, sentences: Union[str, List[str]], batch_size: int = 32, prompt_name: Optional[str] = None, **kwargs) -> Union[np.ndarray, torch.Tensor]:
-        #print(f"encode called with: sentences (len={len(sentences)}), batch_size={batch_size}, prompt_name={prompt_name}, kwargs={kwargs}")
+        if isinstance(sentences, str):
+            sentences = [sentences]
+
         embeddings_list = []
 
         for model, tokenizer, model_key in zip(self.models, self.tokenizers, self.model_keys):
+            model_batches = []
+            # Wrap the batch iteration in tqdm for a progress bar.
+            for start in tqdm(range(0, len(sentences), batch_size), desc=f"Processing {model_key} batches", leave=False):
+                batch = sentences[start:start + batch_size]
+                if model_key.startswith("e5"):
+                    batch_emb = self._hf_encode(model, tokenizer, batch, **kwargs)
+                elif model_key == "no-ins":
+                    batch_emb = self._noins_encode(model, tokenizer, batch, **kwargs)
+                elif model_key == "mxbai" or "snowflake" in model_key:
+                    prompt_name = kwargs.get("prompt_type", None)
+                    if prompt_name == PromptType.query:
+                        batch_emb = model.encode(
+                            batch,
+                            batch_size=batch_size,
+                            prompt_name="query",
+                            show_progress_bar=False,
+                            convert_to_tensor=True
+                        ).to(self.device)
+                    else:
+                        batch_emb = model.encode(
+                            batch,
+                            batch_size=batch_size,
+                            show_progress_bar=False,
+                            convert_to_tensor=True
+                        ).to(self.device)
+                model_batches.append(batch_emb)
 
-            if model_key.startswith("e5"):
-                embeddings = self._hf_encode(model, tokenizer, sentences, prompt_name=prompt_name, **kwargs)
-            else:
-                # SentenceTransformer models:  No need for prompt handling here.
-                if "snowflake" in model_key and prompt_name == PromptType.query:
-                     kwargs['prompt_name'] = PromptType.query
-                else:
-                      kwargs.pop("prompt_name", None)
+            model_embeddings = torch.cat(model_batches, dim=0)
+            embeddings_list.append(model_embeddings)
 
-                with torch.no_grad(): # Sentence Transformers also don't need grads
-                    embeddings = model.encode(sentences, batch_size=batch_size,  **kwargs, show_progress_bar=True, convert_to_tensor=True).to(self.device)
-            
-            embeddings_list.append(embeddings)
-
-
+        # If only one model is used, optionally pass through the encoder.
         if self.single_model:
             if hasattr(self, 'encoder'):
+                print("> Decoder in")
                 encoded = self.encoder(embeddings_list[0], dim=self.truncate)
                 return encoded
             return embeddings_list[0]
 
         concat = torch.cat(embeddings_list, dim=1)
         concat = F.normalize(concat, p=2, dim=1)
+
+        print(f"Concat, and norm'd, shape: {concat.shape}")
+
         if hasattr(self, 'encoder'):
             encoded = self.encoder(concat, dim=self.truncate)
             if hasattr(self, 'quantizer'):
                 return self.quantizer.quantize(encoded)
             return encoded
+
         return concat
-
-
 
 def main():
     if len(sys.argv) < 4:
@@ -197,7 +253,7 @@ def main():
 
     # Determine model keys based on model_type
     if model_type == "combined":
-        model_keys = ["e5-small", "snowflake-m"]
+        model_keys = ["e5-small", "no-ins"]
     elif model_type == "all-33":
         model_keys = ["bge-small", "e5-small", "gist"]
     elif model_type == "all-4":
@@ -233,8 +289,7 @@ def main():
         eval_splits=["test"],
         verbosity = 1,
         encode_kwargs={
-            "batch_size" : 8,
-            "show_progress_bar" : True
+            "batch_size" : 512,
         }
     )
     
