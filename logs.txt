@@ -1,3 +1,12 @@
 run 171039 [32, 64, 128, 256, 384, 512, 768, 1024, 1024] In 1920 Out 1920
 run 084059 1920 768 [50, 60, 70, 80, 100, 120, 150, 200, 250, 320, 350, 384, 768] Obs
 run 094314 1920 768 [50, 60, 70, 80, 100, 120, 150, 200, 250, 320, 350, 384, 768] Obs
+run 111340 768 768 [16, 32, 64, 128, 256, 384, 512, 768] Obs
+run 120403 768 768 [16, 32, 64, 128, 256, 384, 512, 768] Obs: first KL run
+run 121659 768 768 [16, 32, 64, 128, 256, 384, 512, 768] Obs: first KL run
+run 125423 768 768 [256, 384, 512, 768] Obs: first teacher ish thing with normal loss run
+run 131141 768 512 [256, 384, 512] Obs: first teacher ish thing with normal loss run
+run 132331 768 512 [256, 384, 512] Obs: first teacher ish thing with normal loss run
+run 132629 768 512 [256, 384, 512] Obs: first teacher ish thing with normal loss run
+run 134609 768 512 [256, 384, 512] Obs: first teacher ish thing with normal loss run
+run 142214 768 512 [256, 384, 512] Obs: first teacher ish thing with normal loss run

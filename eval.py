@@ -207,19 +207,25 @@ class AdaptiveSentenceTransformer(Encoder):
         if self.single_model:
             if hasattr(self, 'encoder'):
                 print("> Decoder in")
-                encoded = self.encoder(embeddings_list[0], dim=self.truncate)
+                encoded = self.encoder(embeddings_list[0])
+                if self.truncate:
+                    print(f"> Truncating up to {self.truncate}")
+                    return F.normalize(encoded[:,:self.truncate], p=2, dim=1)
                 return encoded
             return embeddings_list[0]
 
         concat = torch.cat(embeddings_list, dim=1)
         concat = F.normalize(concat, p=2, dim=1)
 
-        print(f"Concat, and norm'd, shape: {concat.shape}")
 
         if hasattr(self, 'encoder'):
-            encoded = self.encoder(concat, dim=self.truncate)
+            encoded = self.encoder(concat)
+            if self.truncate:
+                print(f"> Encoder + Truncating up to {self.truncate}")
+                return F.normalize(encoded[:,:self.truncate], p=2, dim=1)
             if hasattr(self, 'quantizer'):
                 return self.quantizer.quantize(encoded)
+            print("Encoder returning ", encoded.shape)
             return encoded
 
         return concat
@@ -240,15 +246,18 @@ def main():
     batch_size = int(sys.argv[8]) if len(sys.argv) > 8 else 512
 
     run_id = random_tag.split("-")[0]
+    print("Id of the run ", run_id)
     inDim, outDim = 0, 0
 
     if use_encoder:
+        print("we here")
         log_file = "logs.txt"
         with open(log_file, "r") as f:
             for line in f:
                 parts = line.strip().split()
                 if parts[1] == run_id:
                     inDim, outDim = int(parts[2]), int(parts[3])
+                    print("we here", inDim, outDim)
                     break
 
     # Determine model keys based on model_type

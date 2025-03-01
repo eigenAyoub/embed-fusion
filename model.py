@@ -1,16 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-enc_config = {
-    'input_dim':  768,
-    'output_dim': 256,
-}
-
-outDim = enc_config["output_dim"]
-
-COMPRESSED_DIMENSIONS = [64, 256, outDim]   
-
 class EncoderOnly(nn.Module):
     def __init__(self, cfg: dict = None):
         super().__init__()
@@ -35,7 +25,6 @@ class EncoderOnly(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x, dim):
-        out = self.encoder(x)
-        # L2 normalize output embeddings
-        return F.normalize(out[:,:dim], p=2, dim=1)
+    def forward(self, x):
+        return self.encoder(x)
+        #return F.normalize(out[:,:dim], p=2, dim=1)

@@ -60,24 +60,19 @@ class KLSimilarityLoss(nn.Module):
         self.temperature = temperature
 
     def forward(self, model_output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        # Compute cosine similarity matrices for student and teacher
+
         sim_outputs = F.cosine_similarity(model_output.unsqueeze(1), model_output.unsqueeze(0), dim=-1)
         sim_targets = F.cosine_similarity(targets.unsqueeze(1), targets.unsqueeze(0), dim=-1)
 
         mask = torch.eye(sim_outputs.size(0), device=sim_outputs.device).bool()
-        sim_outputs = sim_outputs.masked_fill(mask, float('-inf'))
-        sim_targets = sim_targets.masked_fill(mask, float('-inf'))
+
+        large_negative = -1e9
+        sim_outputs = sim_outputs.masked_fill(mask, large_negative)
+        sim_targets = sim_targets.masked_fill(mask, large_negative)
         
-        # Apply softmax (and log_softmax for the student) with temperature scaling
         student_log_probs = F.log_softmax(sim_outputs / self.temperature, dim=-1)
         teacher_probs     = F.softmax(sim_targets / self.temperature, dim=-1)
         
-        # Compute the KL divergence for each row and average over the batch
         loss = F.kl_div(student_log_probs, teacher_probs, reduction='batchmean')
         
         return self.weight * loss
-
-
-
-
-    
