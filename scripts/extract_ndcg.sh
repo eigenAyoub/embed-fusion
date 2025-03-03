@@ -24,8 +24,9 @@ TASK_NAME="$1"
 INSERT_NAME_BASE="$2"
 
 #epochs=(01 03 05 06 07 08 09 11 13 15 17 19 21 22 23 24)
-#epochs=(01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20)
-epochs=(01 02)
+#epochs=(01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20) 
+
+epochs=(02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 26 27 28 30)
 
 # Define a function to extract the desired metric using jq
 extract_metric() {
@@ -61,12 +62,12 @@ echo "--------------------------------------------"
 
 for ep in "${epochs[@]}"; do
     # Construct the insert-name-here argument based on the current epoch
-    insert_name="${INSERT_NAME_BASE}_0${ep}"
+    insert_name="${INSERT_NAME_BASE}-${ep}"
 
     # Extract the ndcg_at_10 metric
     score=$(extract_metric "$insert_name" "$TASK_NAME" "ndcg_at_10")
 
     # Display the formatted output
-    echo "epoch ${ep}   ndcg_at_10:   ${score}"
+    echo "epoch ${ep}   ndcg_at_10:   ${score} ${insert_name}"
 done
 

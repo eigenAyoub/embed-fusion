@@ -1,0 +1,11 @@
+click==8.1.8
+datasets==2.21.0
+mteb==1.31.6
+numpy==2.2.3
+orjson==3.10.15
+pandas==2.2.3
+scikit_learn==1.6.1
+sentence_transformers==3.4.1
+torch==2.5.1
+tqdm==4.67.1
+transformers==4.48.1

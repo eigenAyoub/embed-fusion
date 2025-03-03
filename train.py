@@ -10,10 +10,11 @@ from torch.utils.data import DataLoader
 from data_loader import get_data
 from loss import SimilarityLoss, Similarity, KLSimilarityLoss
 from model import EncoderOnly 
+from config import BATCH_SIZE as b_size
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-NUM_EPOCHS = 20
+NUM_EPOCHS = 30
 LEARNING_RATE = 3e-4
 WEIGHT_DECAY  = 1e-5
 STEP_SIZE = 4
@@ -74,7 +75,7 @@ class Trainer:
         self.train_losses: List[float] = []
         self.val_losses: List[float] = []
 
-    def train_epoch(self) -> float:
+    def train_epoch(self, epoch: int) -> float:
         """Run one epoch of training.
         For each batch, the model processes the student_inputs once per MRL dimension.
         The student loss compares the output to student_inputs, while the teacher loss
@@ -82,6 +83,8 @@ class Trainer:
         """
         self.model.train()
         running_loss = 0.0
+        #self.teacher_loss_weight = 0.1 + (0.3*epoch)/29
+
 
         if self.teacher_train_loader is not None:
             loader = zip(self.train_loader, self.teacher_train_loader)
@@ -100,16 +103,13 @@ class Trainer:
                 teacher_targets = teacher_batch.to(self.device)
 
             for dim in self.mrl_dims:
-                # Process the student inputs once per dimension.
                 student_out = F.normalize(student_full[:,:dim], p=2, dim=1)
                 loss_student += self.criterion(student_out, student_inputs)
                 
-                # Compute teacher loss by comparing the student output to teacher targets.
                 if teacher_batch is not None:
                     loss_teacher += self.criterion(student_out, teacher_targets)
 
-            # Combine the losses; teacher loss is weighted.
-            loss = loss_student + self.teacher_loss_weight * loss_teacher
+            loss = 0.8 * loss_student + 0.2 * loss_teacher
             loss.backward()
             self.optimizer.step()
 
@@ -135,25 +135,23 @@ class Trainer:
                 if teacher_batch is not None:
                     teacher_inputs = teacher_batch.to(self.device)
                 
-                
                 student_full= self.model(student_inputs)
 
                 for dim in self.mrl_dims:
 
                     student_out = F.normalize(student_full[:,:dim], p=2, dim=1)
-                    #loss_student += self.criterion(student_out, student_inputs)
+                    loss_student += self.criterion(student_out, student_inputs)
 
                     if teacher_batch is not None:
                         loss_teacher += self.criterion(student_out, teacher_inputs)
 
                 # Combine the losses; teacher loss is weighted.
-                loss = loss_student + self.teacher_loss_weight * loss_teacher
-                #loss = self.teacher_loss_weight * loss_teacher
+                loss = 0.8 * loss_student + 0.2 * loss_teacher
                 running_loss += loss.item()
 
         return running_loss / len(self.val_loader)
 
-    def save_checkpoint(self, epoch: int, val_loss: int, is_best: bool = False):
+    def save_checkpoint(self, epoch: int):
         """Save model checkpoint"""
         checkpoint = {
             'epoch': epoch,
@@ -168,23 +166,16 @@ class Trainer:
         inDim  = self.enc_config["input_dim"]
         outDim = self.enc_config["output_dim"]
 
-        # Regular checkpoint
-        if epoch % self.save_freq == 0:
-            path = self.checkpoint_dir /      f'{inDim}_{outDim}_ep_{epoch:03d}_{self.now}.pth'
-            torch.save(checkpoint, path)
-            print(f"Saved checkpoint to {path}")
+        path = self.checkpoint_dir / f'{inDim}_{outDim}_ep_{epoch:03d}_{self.now}.pth'
+        torch.save(checkpoint, path)
+        print(f"Saved checkpoint to {path}")
             
-        # Best model checkpoint
-        if is_best:
-            best_path = self.checkpoint_dir / f"{inDim}_{outDim}_ep_{epoch:03d}_{self.now}.pth"
-            torch.save(checkpoint, best_path)
-            print(f"Saved best model to {best_path}")
 
     def train(self, num_epochs: int = NUM_EPOCHS):
         """Main training loop with checkpoint saving"""
         for epoch in range(num_epochs):
 
-            train_loss = self.train_epoch()
+            train_loss = self.train_epoch(epoch)
             val_loss = self.validate()
             self.scheduler.step()
             
@@ -197,10 +188,11 @@ class Trainer:
             
             # Save checkpoints
             is_best = val_loss < self.best_val_loss
+
             if is_best:
                 self.best_val_loss = val_loss
             
-            self.save_checkpoint(epoch + 1,val_loss, is_best)
+            self.save_checkpoint(epoch + 1)
             
 
 def main():
@@ -225,13 +217,13 @@ def main():
     inDim = model_config["input_dim"]
     outDim = model_config["output_dim"]
 
-    COMPRESSED_DIMENSIONS = [64, 128, 256, 384, 512, 768, 1024]
+    COMPRESSED_DIMENSIONS = [32, 64, 100, 150, 200, 250, 300, 350, 384, 512, 768, outDim]
 
     model = EncoderOnly(model_config)
-    
     now = datetime.datetime.now().strftime("%H%M%S")
     
-    log_line = f"run {now} {inDim} {outDim} {COMPRESSED_DIMENSIONS} Obs: first teacher ish thing with normal loss run\n"
+    log_line = f"run {now} {inDim} {outDim} {COMPRESSED_DIMENSIONS} Loader batch size {b_size} Obs: first teacher ish thing with normal loss run\n"
+
     with open("logs.txt", "a") as f:
         f.write(log_line)
 

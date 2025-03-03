@@ -181,25 +181,35 @@ class AdaptiveSentenceTransformer(Encoder):
                     batch_emb = self._hf_encode(model, tokenizer, batch, **kwargs)
                 elif model_key == "no-ins":
                     batch_emb = self._noins_encode(model, tokenizer, batch, **kwargs)
-                elif model_key == "mxbai" or "snowflake" in model_key:
+                else:  # dealing with SentenceTransformer stuff
                     prompt_name = kwargs.get("prompt_type", None)
                     if prompt_name == PromptType.query:
-                        batch_emb = model.encode(
-                            batch,
-                            batch_size=batch_size,
-                            prompt_name="query",
-                            show_progress_bar=False,
-                            convert_to_tensor=True
-                        ).to(self.device)
+                        if model_key == "mxbai" or "snowflake" in model_key:
+                            batch_emb = model.encode(
+                                batch,
+                                batch_size=batch_size,
+                                prompt_name="query",
+                                show_progress_bar=False,
+                                convert_to_tensor=True
+                            ).to(self.device)
+                        elif model_key == "linq":
+                            task = 'Given a query, retrieve passages that answer the question/query'
+                            prompt = f"Instruct: {task}\nQuery: "
+                            batch_emb = model.encode(
+                                batch,
+                                batch_size=32,
+                                prompt=prompt,
+                                show_progress_bar=False,
+                                convert_to_tensor=True
+                            ).to(self.device)
                     else:
                         batch_emb = model.encode(
                             batch,
-                            batch_size=batch_size,
+                            batch_size=32,
                             show_progress_bar=False,
                             convert_to_tensor=True
                         ).to(self.device)
                 model_batches.append(batch_emb)
-
             model_embeddings = torch.cat(model_batches, dim=0)
             embeddings_list.append(model_embeddings)
 
@@ -217,7 +227,6 @@ class AdaptiveSentenceTransformer(Encoder):
         concat = torch.cat(embeddings_list, dim=1)
         concat = F.normalize(concat, p=2, dim=1)
 
-
         if hasattr(self, 'encoder'):
             encoded = self.encoder(concat)
             if self.truncate:
@@ -225,10 +234,11 @@ class AdaptiveSentenceTransformer(Encoder):
                 return F.normalize(encoded[:,:self.truncate], p=2, dim=1)
             if hasattr(self, 'quantizer'):
                 return self.quantizer.quantize(encoded)
-            print("Encoder returning ", encoded.shape)
+            print("> Concat + Encoder (no truncation) > returning:", encoded.shape)
             return encoded
-
-        return concat
+        else:
+            print(f"Concat with No encoder {concat.shape}")
+            return concat
 
 def main():
     if len(sys.argv) < 4:
