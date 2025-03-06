@@ -254,12 +254,14 @@ def main():
         
     
     print("Usage: python eval.py <model> <task> <use_enc> <ckpt> <trunc>  <use_quant> <quant> <tag>")
+    # To eval a single model: 
+    # python eval.py e5-small NFCorpus 0 x 0 0 x e5-small-metrics")
 
     # model_type + task
     model_type = sys.argv[1]
     tsk = sys.argv[2]
 
-    # decoder
+    # decoder # set to `0 x` if not needed.
     use_encoder = bool(int(sys.argv[3])) 
     ckpt = sys.argv[4] if use_encoder else None
 
