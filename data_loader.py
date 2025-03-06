@@ -64,7 +64,7 @@ def get_data(path):
         train_dataset, 
         batch_size=BATCH_SIZE, 
         #shuffle=True, 
-        num_workers=NUM_WORKERS
+        num_workers=NUM_WORKERS,
     )
     
     

@@ -83,8 +83,10 @@ class Trainer:
         """
         self.model.train()
         running_loss = 0.0
-        #self.teacher_loss_weight = 0.1 + (0.3*epoch)/29
 
+        self.teacher_loss_weight = 0.1 + (0.3*epoch)/29
+
+        print(f"Epoch {epoch} Teach coeff {self.teacher_loss_weight}")
 
         if self.teacher_train_loader is not None:
             loader = zip(self.train_loader, self.teacher_train_loader)
@@ -109,11 +111,11 @@ class Trainer:
                 if teacher_batch is not None:
                     loss_teacher += self.criterion(student_out, teacher_targets)
 
-            loss = 0.8 * loss_student + 0.2 * loss_teacher
+            loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
             loss.backward()
             self.optimizer.step()
 
-            running_loss += loss.item()
+            running_loss += loss_teacher.item()
 
         return running_loss / len(self.train_loader)
 
@@ -132,10 +134,11 @@ class Trainer:
                 student_inputs = student_batch.to(self.device)
                 loss_student = 0.0
                 loss_teacher = 0.0
+
                 if teacher_batch is not None:
-                    teacher_inputs = teacher_batch.to(self.device)
+                    teacher_targets = teacher_batch.to(self.device)
                 
-                student_full= self.model(student_inputs)
+                student_full = self.model(student_inputs)
 
                 for dim in self.mrl_dims:
 
@@ -143,10 +146,9 @@ class Trainer:
                     loss_student += self.criterion(student_out, student_inputs)
 
                     if teacher_batch is not None:
-                        loss_teacher += self.criterion(student_out, teacher_inputs)
+                        loss_teacher += self.criterion(student_out, teacher_targets)
 
-                # Combine the losses; teacher loss is weighted.
-                loss = 0.8 * loss_student + 0.2 * loss_teacher
+                loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
                 running_loss += loss.item()
 
         return running_loss / len(self.val_loader)
@@ -197,7 +199,7 @@ class Trainer:
 
 def main():
   
-    tag = "e5-small-no-ins"
+    tag = "all-33M"
     student_train_path = f"generate_data/{tag}/train_embeddings.npy"
     student_val_path = f"generate_data/{tag}/val_embeddings.npy"
     teacher_train_path = "generate_data/embeddings_data/f_mxbai_wiki_500k/train_embeddings.npy"
@@ -210,18 +212,19 @@ def main():
     teacher_val_loader = get_data(teacher_val_path)
 
     model_config = {
-                    'input_dim':  768,
+                    'input_dim':  1152,
                     'output_dim': 1024,
                 }
 
     inDim = model_config["input_dim"]
     outDim = model_config["output_dim"]
 
-    COMPRESSED_DIMENSIONS = [32, 64, 100, 150, 200, 250, 300, 350, 384, 512, 768, outDim]
+    COMPRESSED_DIMENSIONS = [256, 384, 512, 768, outDim]
 
     model = EncoderOnly(model_config)
     now = datetime.datetime.now().strftime("%H%M%S")
-    
+   
+    run_desc = "We use 3 small models here, input dim 1152. Teacher will be used with a coeff of 0.3." 
     log_line = f"run {now} {inDim} {outDim} {COMPRESSED_DIMENSIONS} Loader batch size {b_size} Obs: first teacher ish thing with normal loss run\n"
 
     with open("logs.txt", "a") as f:

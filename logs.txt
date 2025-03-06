@@ -15,3 +15,10 @@ run 112846 768 1024 [64, 128, 256, 384, 512, 768, 1024] Obs: first teacher ish t
 run 133334 768 768 [128, 256, 384, 512, 768] Loader batch size 128 Obs: first teacher ish thing with normal loss run
 run 221301 768 768 [32, 64, 100, 150, 200, 250, 300, 350, 384, 512, 768] Loader batch size 256 Obs: first teacher ish thing with normal loss run
 run 170658 768 1024 [32, 64, 100, 150, 200, 250, 300, 350, 384, 512, 768, 1024] Loader batch size 512 Obs: first teacher ish thing with normal loss run
+run 174805 768 1024 [32, 64, 100, 150, 200, 250, 300, 350, 384, 512, 768, 1024] Loader batch size 512 Obs: first teacher ish thing with normal loss run
+run 175542 768 1024 [32, 64, 100, 150, 200, 250, 300, 350, 384, 512, 768, 1024] Loader batch size 512 Obs: first teacher ish thing with normal loss run
+run 180124 768 1024 [32, 64, 100, 150, 200, 250, 300, 350, 384, 512, 768, 1024] Loader batch size 512 Obs: first teacher ish thing with normal loss run
+run 120042 1152 1024 [256, 384, 512, 768, 1024] Loader batch size 512 Obs: first teacher ish thing with normal loss run
+run 121113 1152 1024 [256, 384, 512, 768, 1024] Loader batch size 512 Obs: first teacher ish thing with normal loss run
+run 125606 1152 1024 [256, 384, 512, 768, 1024] Loader batch size 512 Obs: first teacher ish thing with normal loss run
+run 134840 1152 1024 [256, 384, 512, 768, 1024] Loader batch size 512 Obs: first teacher ish thing with normal loss run

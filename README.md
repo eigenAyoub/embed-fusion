@@ -25,3 +25,7 @@
 
 
 
+* all-33M mse on similarity matrix.
+* all-33M mse on softmax + similarity matrix.
+
+* try `pin_memory = True` see if it helps with memory loading.

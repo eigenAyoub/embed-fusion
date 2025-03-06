@@ -5,8 +5,8 @@ from typing import List, Union, Dict, Optional
 
 from mteb.encoder_interface import Encoder, PromptType
 
-from model import EncoderOnly  # Your custom encoder
-from offline_quant import PerColumnQuantizer  # Your quantizer
+from model import EncoderOnly  
+from offline_quant import PerColumnQuantizer  
 
 import torch
 import torch.nn.functional as F
@@ -26,25 +26,24 @@ if torch.cuda.is_available():
 np.random.seed(seed)
 random.seed(seed)
 
-# Global model cache (to avoid reloading models unnecessarily)
-MODEL_CACHE = {}
 
 class AdaptiveSentenceTransformer(Encoder):
     MODEL_CATALOGUE: Dict[str, str] = {
         "mxbai": "mixedbread-ai/mxbai-embed-large-v1",
-        "bge": "BAAI/bge-large-en-v1.5",
         "e5": "intfloat/e5-large-v2",
+        "bge": "BAAI/bge-large-en-v1.5",
         "snowflake-l": "Snowflake/snowflake-arctic-embed-l",
+        "snowflake-m": "Snowflake/snowflake-arctic-embed-m-v1.5",
         "gte-base": "thenlper/gte-base",
         "gte-large": "thenlper/gte-large",
         "gte-small": "thenlper/gte-small",
-        "snowflake-m": "Snowflake/snowflake-arctic-embed-m-v1.5",
         "jina-v3": "jinaai/jina-embeddings-v3",
         "e5-small": "intfloat/e5-small-v2",
         "bge-small": "BAAI/bge-small-en-v1.5",
         "gist": "avsolatorio/GIST-small-Embedding-v0",
         "linq": "Linq-AI-Research/Linq-Embed-Mistral",
-        "no-ins": "avsolatorio/NoInstruct-small-Embedding-v0"
+        "no-ins": "avsolatorio/NoInstruct-small-Embedding-v0",
+        "infly":"infly/inf-retriever-v1-1.5b"
     }
 
     def __init__(self,
@@ -65,25 +64,26 @@ class AdaptiveSentenceTransformer(Encoder):
 
         for model_key in models:
             model_path = self.MODEL_CATALOGUE.get(model_key)
+
             if model_path is None:
                 raise ValueError(f"Model '{model_key}' not found.")
 
-            # Use the global model cache
-            if model_path not in MODEL_CACHE:
-                if model_key.startswith("e5"):
-                    tokenizer = AutoTokenizer.from_pretrained(model_path)
-                    model = AutoModel.from_pretrained(model_path).to(device)
-                    MODEL_CACHE[model_path] = (model, tokenizer)
-                elif model_key == "no-ins":
-                    tokenizer = AutoTokenizer.from_pretrained(model_path)
-                    model = AutoModel.from_pretrained(model_path).to(device)
-                    MODEL_CACHE[model_path] = (model, tokenizer)
-                else:
-                    model = SentenceTransformer(model_path, trust_remote_code=True).to(device)
-                    MODEL_CACHE[model_path] = (model, None)
+            if model_key.startswith("e5"):
+                tokenizer = AutoTokenizer.from_pretrained(model_path)
+                model = AutoModel.from_pretrained(model_path).to(device)
+                #MODEL_CACHE[model_path] = (model, tokenizer)
+            elif model_key == "no-ins":
+                tokenizer = AutoTokenizer.from_pretrained(model_path)
+                model = AutoModel.from_pretrained(model_path).to(device)
+                #MODEL_CACHE[model_path] = (model, tokenizer)
+            else:
+                model = SentenceTransformer(model_path, trust_remote_code=True).to(device)
+                tokenizer = None
+                if model_key == "infly":
+                    model.max_seq_length = 512 
 
             model.eval()
-            model, tokenizer = MODEL_CACHE[model_path]
+            #model, tokenizer = MODEL_CACHE[model_path]
             self.models.append(model)
             self.tokenizers.append(tokenizer)
             self.model_keys.append(model_key)
@@ -174,7 +174,6 @@ class AdaptiveSentenceTransformer(Encoder):
 
         for model, tokenizer, model_key in zip(self.models, self.tokenizers, self.model_keys):
             model_batches = []
-            # Wrap the batch iteration in tqdm for a progress bar.
             for start in tqdm(range(0, len(sentences), batch_size), desc=f"Processing {model_key} batches", leave=False):
                 batch = sentences[start:start + batch_size]
                 if model_key.startswith("e5"):
@@ -184,7 +183,10 @@ class AdaptiveSentenceTransformer(Encoder):
                 else:  # dealing with SentenceTransformer stuff
                     prompt_name = kwargs.get("prompt_type", None)
                     if prompt_name == PromptType.query:
-                        if model_key == "mxbai" or "snowflake" in model_key:
+                        if model_key in ["mxbai", "infly"] or "snowflake" in model_key:
+                            print(f"> Encoding: {model_key}")
+                            if model_key == "infly":
+                                batch_size = 4
                             batch_emb = model.encode(
                                 batch,
                                 batch_size=batch_size,
@@ -202,10 +204,18 @@ class AdaptiveSentenceTransformer(Encoder):
                                 show_progress_bar=False,
                                 convert_to_tensor=True
                             ).to(self.device)
-                    else:
+                        else:  # other sentenceTransformer models that do not rely on a prompt.
+                            print(f"> batch_size {batch_size}")
+                            batch_emb = model.encode(
+                                batch,
+                                batch_size=batch_size,
+                                show_progress_bar=False,
+                                convert_to_tensor=True
+                            ).to(self.device)
+                    else:  # for the documents encoding.
                         batch_emb = model.encode(
                             batch,
-                            batch_size=32,
+                            batch_size=batch_size,
                             show_progress_bar=False,
                             convert_to_tensor=True
                         ).to(self.device)
@@ -241,25 +251,36 @@ class AdaptiveSentenceTransformer(Encoder):
             return concat
 
 def main():
-    if len(sys.argv) < 4:
-        print("Usage: python eval.py <checkpoint> <truncate> <model_type> ...")
-        sys.exit(1)
+        
+    
+    print("Usage: python eval.py <model> <task> <use_enc> <ckpt> <trunc>  <use_quant> <quant> <tag>")
 
-    ckpt = sys.argv[1]
-    trunc = int(sys.argv[2])
-    model_type = sys.argv[3]
-    tsk = sys.argv[4]
-    use_encoder = bool(int(sys.argv[5])) if len(sys.argv) > 5 else False
-    random_tag = sys.argv[6]
-    my_quant = sys.argv[7]
-    use_quant = len(sys.argv[7]) > 1
-    batch_size = int(sys.argv[8]) if len(sys.argv) > 8 else 512
+    # model_type + task
+    model_type = sys.argv[1]
+    tsk = sys.argv[2]
 
-    run_id = random_tag.split("-")[0]
-    print("Id of the run ", run_id)
+    # decoder
+    use_encoder = bool(int(sys.argv[3])) 
+    ckpt = sys.argv[4] if use_encoder else None
+
+    # trunc
+    trunc = int(sys.argv[5])   # no far it is only accounted if the encoder is in.
+
+    # quant
+    use_quant = bool(int(sys.argv[6]))
+    my_quant = sys.argv[7] if use_quant else None
+
+    # name tage for resutls
+    random_tag = sys.argv[8]
+    
+    print(f"Encoder ? {use_encoder}")
+    print(f"Quant? {use_quant}")
+
     inDim, outDim = 0, 0
 
     if use_encoder:
+        run_id = random_tag.split("-")[0]
+        print("Id of the run ", run_id)
         print("we here")
         log_file = "logs.txt"
         with open(log_file, "r") as f:
@@ -270,15 +291,18 @@ def main():
                     print("we here", inDim, outDim)
                     break
 
-    # Determine model keys based on model_type
-    if model_type == "combined":
+    if model_type == "combined-s":
         model_keys = ["e5-small", "no-ins"]
-    elif model_type == "all-33":
-        model_keys = ["bge-small", "e5-small", "gist"]
+    elif model_type == "combined-l":
+        model_keys = ["e5", "mxbai"]
+    elif model_type == "three-33M":
+        model_keys = ["e5-small", "no-ins", "gte-small"]
     elif model_type == "all-4":
         model_keys = ["bge-small", "e5-small", "gist", "snowflake-m"]
     else:
         model_keys = [model_type]  # Single model
+
+    print(f"Model keys > {model_keys}")
 
     # Create the AdaptiveSentenceTransformer *once*
     model = AdaptiveSentenceTransformer(
@@ -292,6 +316,8 @@ def main():
     )
 
     output_folder = f"results/{random_tag}"
+    
+    print(random_tag)
 
     tasks = mteb.get_tasks(tasks=[tsk])
 

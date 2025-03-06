@@ -13,7 +13,7 @@ from eval import AdaptiveSentenceTransformer
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-model_key = "mxbai"
+model_key = "gte-small"
 print(f"Generating for {model_key}")
 
 split_dir = "split_indices"

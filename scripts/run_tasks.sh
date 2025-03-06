@@ -9,8 +9,7 @@ fi
 model_name="$1"
 tag_name="$2"
 
-#for task in NFCorpus SciFact ArguAna QuoraRetrieval NQ; do
-for task in NFCorpus SciFact ArguAna; do
-    python eval.py x 0 "$model_name" "$task" 0 "$tag_name" x 0
+for task in NFCorpus SciFact ArguAna SCIDOCS QuoraRetrieval; do
+    python eval.py "$1" "$task" 0 x 0 0 x  "$2" 
 done
 

@@ -3,23 +3,23 @@ import numpy as np
 import sys
 import os
 
-# Check if enough arguments are provided
-if len(sys.argv) != 4:
-    print("Usage: python script.py file1 file2 output_folder")
-    sys.exit(1)
-
 file1  = sys.argv[1]
 file2  = sys.argv[2]
-output = sys.argv[3]
+file3  = sys.argv[3]
+
+output = sys.argv[4]
 
 # Load the training and validation embeddings
 array1 = np.load(f"embeddings_data/{file1}/train_embeddings.npy")
 array2 = np.load(f"embeddings_data/{file2}/train_embeddings.npy")
+array5 = np.load(f"embeddings_data/{file3}/train_embeddings.npy")
+
 array3 = np.load(f"embeddings_data/{file1}/val_embeddings.npy")
 array4 = np.load(f"embeddings_data/{file2}/val_embeddings.npy")
+array6 = np.load(f"embeddings_data/{file3}/val_embeddings.npy")
 
-result_train = np.concatenate((array1, array2), axis=1)
-result_val   = np.concatenate((array3, array4), axis=1)
+result_train = np.concatenate((array1, array2, array5), axis=1)
+result_val   = np.concatenate((array3, array4, array6), axis=1)
 
 def normalize_rows(matrix):
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)

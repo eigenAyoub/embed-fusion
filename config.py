@@ -3,7 +3,7 @@ import os
 import torch
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-NUM_WORKERS = 64 
+NUM_WORKERS = 128
 TOKENIZERS_PARALLELISM = "false"
 
 BATCH_SIZE = 512

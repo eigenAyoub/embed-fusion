@@ -4,7 +4,7 @@
 # Usage: ./extract_ndch_tasks.sh <model_folder>
 
 MODEL_FOLDER="$1"
-TASKS=("NFCorpus" "SciFact" "ArguAna" "QuoraRetrieval")
+TASKS=("NFCorpus" "SciFact" "ArguAna" "SCIDOCS" "QuoraRetrieval")
 JSON_PATH="results/${MODEL_FOLDER}/no_model_name_available/no_revision_available/"
 
 
