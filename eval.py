@@ -294,9 +294,10 @@ def main():
                     break
 
     if model_type == "combined-s":
-        model_keys = ["e5-small", "no-ins"]
+        model_keys = ["no-ins", "gte-small"]
     elif model_type == "combined-l":
-        model_keys = ["e5", "mxbai"]
+        #model_keys = ["e5", "mxbai"]
+        model_keys =  ["mxbai", "no-ins"]
     elif model_type == "three-33M":
         model_keys = ["e5-small", "no-ins", "gte-small"]
     elif model_type == "all-4":

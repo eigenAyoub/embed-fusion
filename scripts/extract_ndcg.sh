@@ -8,8 +8,7 @@
 usage() {
     echo "Usage: $0 <TaskName> <InsertNameBase>"
     echo "Example:"
-    echo "  $0 SciFact ALL-1024-8MRL-ep"
-    echo "  $0 TaskXX CUSTOM-NAME-ep"
+    echo "  $0 SciFact run-ID-ep"
     exit 1
 }
 
@@ -22,9 +21,6 @@ fi
 # Assign arguments to variables
 TASK_NAME="$1"
 INSERT_NAME_BASE="$2"
-
-#epochs=(01 03 05 06 07 08 09 11 13 15 17 19 21 22 23 24)
-#epochs=(01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20) 
 
 epochs=(02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 26 27 28 30)
 

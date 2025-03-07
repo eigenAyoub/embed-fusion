@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from data_loader import get_data
+from data_loader import get_data, get_data_to_gpu
 from loss import SimilarityLoss, Similarity, KLSimilarityLoss
 from model import EncoderOnly 
 from config import BATCH_SIZE as b_size
@@ -15,9 +15,9 @@ from config import BATCH_SIZE as b_size
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 NUM_EPOCHS = 30
-LEARNING_RATE = 3e-4
-WEIGHT_DECAY  = 1e-5
-STEP_SIZE = 4
+LEARNING_RATE = 1e-3
+WEIGHT_DECAY  = 1e-4
+STEP_SIZE = 10
 GAMMA = 0.1
 PATIENCE = 5
 
@@ -84,9 +84,9 @@ class Trainer:
         self.model.train()
         running_loss = 0.0
 
-        self.teacher_loss_weight = 0.1 + (0.3*epoch)/29
+        self.teacher_loss_weight = 0.5
 
-        print(f"Epoch {epoch} Teach coeff {self.teacher_loss_weight}")
+        print(f"Epoch {epoch}, Teacher coeff {self.teacher_loss_weight}")
 
         if self.teacher_train_loader is not None:
             loader = zip(self.train_loader, self.teacher_train_loader)
@@ -94,7 +94,8 @@ class Trainer:
             loader = ((batch, None) for batch in self.train_loader)
 
         for student_batch, teacher_batch in loader:
-            student_inputs = student_batch.to(self.device)
+            #student_inputs = student_batch.to(self.device)
+            student_inputs = student_batch[0]
             self.optimizer.zero_grad()
 
             student_full= self.model(student_inputs)
@@ -102,7 +103,8 @@ class Trainer:
             loss_student = 0.0
             loss_teacher = 0.0
             if teacher_batch is not None:
-                teacher_targets = teacher_batch.to(self.device)
+                #teacher_targets = teacher_batch.to(self.device)
+                teacher_targets = teacher_batch[0]
 
             for dim in self.mrl_dims:
                 student_out = F.normalize(student_full[:,:dim], p=2, dim=1)
@@ -114,6 +116,7 @@ class Trainer:
             loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
             loss.backward()
             self.optimizer.step()
+
 
             running_loss += loss_teacher.item()
 
@@ -131,17 +134,18 @@ class Trainer:
 
         with torch.no_grad():
             for student_batch, teacher_batch in loader:
-                student_inputs = student_batch.to(self.device)
+                #student_inputs = student_batch.to(self.device)
+                student_inputs = student_batch[0]
                 loss_student = 0.0
                 loss_teacher = 0.0
 
                 if teacher_batch is not None:
-                    teacher_targets = teacher_batch.to(self.device)
+                    #teacher_targets = teacher_batch.to(self.device)
+                    teacher_targets = teacher_batch[0]
                 
                 student_full = self.model(student_inputs)
 
                 for dim in self.mrl_dims:
-
                     student_out = F.normalize(student_full[:,:dim], p=2, dim=1)
                     loss_student += self.criterion(student_out, student_inputs)
 
@@ -179,7 +183,6 @@ class Trainer:
 
             train_loss = self.train_epoch(epoch)
             val_loss = self.validate()
-            self.scheduler.step()
             
             self.train_losses.append(train_loss)
             self.val_losses.append(val_loss)
@@ -189,37 +192,40 @@ class Trainer:
             print(f'Val Loss: {val_loss:.6f}')
             
             # Save checkpoints
-            is_best = val_loss < self.best_val_loss
-
-            if is_best:
+            if  val_loss < self.best_val_loss:
                 self.best_val_loss = val_loss
             
             self.save_checkpoint(epoch + 1)
+
+            self.scheduler.step()
+            current_lr = self.optimizer.param_groups[0]['lr']
+            print(f"Epoch {epoch}: lr = {current_lr}")
             
 
 def main():
   
-    tag = "all-33M"
+    tag = "no-ins-gte-small"
     student_train_path = f"generate_data/{tag}/train_embeddings.npy"
     student_val_path = f"generate_data/{tag}/val_embeddings.npy"
+
     teacher_train_path = "generate_data/embeddings_data/f_mxbai_wiki_500k/train_embeddings.npy"
     teacher_val_path   = "generate_data/embeddings_data/f_mxbai_wiki_500k/val_embeddings.npy"
 
-    train_loader = get_data(student_train_path)
-    val_loader = get_data(student_val_path)
-    
-    teacher_train_loader = get_data(teacher_train_path)
-    teacher_val_loader = get_data(teacher_val_path)
+    val_loader   = get_data_to_gpu(student_val_path)
+    train_loader = get_data_to_gpu(student_train_path)
+
+    teacher_val_loader = get_data_to_gpu(teacher_val_path)
+    teacher_train_loader = get_data_to_gpu(teacher_train_path)
 
     model_config = {
-                    'input_dim':  1152,
-                    'output_dim': 1024,
+                    'input_dim':  768,
+                    'output_dim': 768,
                 }
 
     inDim = model_config["input_dim"]
     outDim = model_config["output_dim"]
 
-    COMPRESSED_DIMENSIONS = [256, 384, 512, 768, outDim]
+    COMPRESSED_DIMENSIONS = [64, 128, 256, 384, 512, outDim]
 
     model = EncoderOnly(model_config)
     now = datetime.datetime.now().strftime("%H%M%S")

@@ -3,10 +3,10 @@ import os
 import torch
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-NUM_WORKERS = 128
+NUM_WORKERS = 16
 TOKENIZERS_PARALLELISM = "false"
 
-BATCH_SIZE = 512
+BATCH_SIZE = 128
 
 LOSS_WEIGHTS = {
     64: 2,    # Highest priority

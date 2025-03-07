@@ -51,7 +51,6 @@ def get_data_loaders():
     return train_loader, val_loader
 
 
-
 def get_data(path):
     train_data = np.load(path)
     
@@ -69,5 +68,17 @@ def get_data(path):
     
     
     return train_loader 
+
+
+def get_data_to_gpu(path):
+
+    data = np.load(path)
+    tensor_data = torch.tensor(data).to("cuda")
+    dataset = torch.utils.data.TensorDataset(tensor_data)
+    
+    loader = DataLoader(dataset, batch_size=BATCH_SIZE, num_workers=0)
+    
+    print(f"Loaded data to GPU: {tensor_data.shape}")
+    return loader
 
 
