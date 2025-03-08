@@ -76,3 +76,45 @@ class KLSimilarityLoss(nn.Module):
         loss = F.kl_div(student_log_probs, teacher_probs, reduction='batchmean')
         
         return self.weight * loss
+
+class WeightedKLSimilarityLoss(nn.Module):
+    def __init__(self, weight: float = 1.0, temperature: float = 1.0, power: float = 2.0):
+        super().__init__()
+        self.weight = weight
+        self.temperature = temperature
+        self.power = power
+
+    def forward(self, model_output: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        sim_outputs = F.cosine_similarity(model_output.unsqueeze(1), model_output.unsqueeze(0), dim=-1)
+        sim_targets = F.cosine_similarity(targets.unsqueeze(1), targets.unsqueeze(0), dim=-1)
+
+        mask = torch.eye(sim_outputs.size(0), device=sim_outputs.device).bool()
+        sim_outputs = sim_outputs.masked_fill(mask, -1e9)
+        sim_targets = sim_targets.masked_fill(mask, -1e9)
+
+        student_log_probs = F.log_softmax(sim_outputs / self.temperature, dim=-1)
+        teacher_probs = F.softmax(sim_targets / self.temperature, dim=-1)
+
+        weights = (teacher_probs ** self.power).detach()
+        loss = (weights * F.kl_div(student_log_probs, teacher_probs, reduction='none')).mean()
+
+        return self.weight * loss
+
+class InfoNCELoss(nn.Module):
+    """InfoNCE Contrastive Loss based on cosine similarity."""
+    def __init__(self, temperature: float = 0.07):
+        super().__init__()
+        self.temperature = temperature
+
+    def forward(self, embeddings1: torch.Tensor, embeddings2: torch.Tensor) -> torch.Tensor:
+        batch_size = embeddings1.size(0)
+
+        sim_matrix = torch.mm(
+            F.normalize(embeddings1, dim=-1), 
+            F.normalize(embeddings2, dim=-1).T
+        ) / self.temperature
+
+        labels = torch.arange(batch_size, device=embeddings1.device)
+        loss = F.cross_entropy(sim_matrix, labels)
+
+        return loss

@@ -244,8 +244,8 @@ class AdaptiveSentenceTransformer(Encoder):
                 return F.normalize(encoded[:,:self.truncate], p=2, dim=1)
             if hasattr(self, 'quantizer'):
                 return self.quantizer.quantize(encoded)
-            print("> Concat + Encoder (no truncation) > returning:", encoded.shape)
-            return encoded
+            print("> Concat + Encoder (no truncation) > returning:", encoded[0].shape)
+            return encoded[0]
         else:
             print(f"Concat with No encoder {concat.shape}")
             return concat

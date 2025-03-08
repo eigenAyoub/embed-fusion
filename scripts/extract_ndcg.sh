@@ -22,7 +22,7 @@ fi
 TASK_NAME="$1"
 INSERT_NAME_BASE="$2"
 
-epochs=(02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 26 27 28 30)
+epochs=(01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30)
 
 # Define a function to extract the desired metric using jq
 extract_metric() {

@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 from data_loader import get_data, get_data_to_gpu
-from loss import SimilarityLoss, Similarity, KLSimilarityLoss
+from loss import SimilarityLoss, Similarity, KLSimilarityLoss, InfoNCELoss 
 from model import EncoderOnly 
 from config import BATCH_SIZE as b_size
 
@@ -18,7 +18,7 @@ NUM_EPOCHS = 30
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY  = 1e-4
 STEP_SIZE = 10
-GAMMA = 0.1
+GAMMA = 0.8
 PATIENCE = 5
 
 class Trainer:
@@ -51,7 +51,10 @@ class Trainer:
         self.enc_config = enc_config
         self.now = now 
         self.mrl_dims = dims
-        
+       
+       
+       
+        ## 
         self.criterion = SimilarityLoss()
         self.teacher_loss_weight = teacher_loss_weight
         
@@ -84,8 +87,7 @@ class Trainer:
         self.model.train()
         running_loss = 0.0
 
-        self.teacher_loss_weight = 0.5
-
+        self.teacher_loss_weight = 0.7
         print(f"Epoch {epoch}, Teacher coeff {self.teacher_loss_weight}")
 
         if self.teacher_train_loader is not None:
@@ -94,29 +96,31 @@ class Trainer:
             loader = ((batch, None) for batch in self.train_loader)
 
         for student_batch, teacher_batch in loader:
-            #student_inputs = student_batch.to(self.device)
             student_inputs = student_batch[0]
             self.optimizer.zero_grad()
 
-            student_full= self.model(student_inputs)
-
             loss_student = 0.0
             loss_teacher = 0.0
-            if teacher_batch is not None:
-                #teacher_targets = teacher_batch.to(self.device)
-                teacher_targets = teacher_batch[0]
 
-            for dim in self.mrl_dims:
-                student_out = F.normalize(student_full[:,:dim], p=2, dim=1)
-                loss_student += self.criterion(student_out, student_inputs)
+            student_full, hidden_full = self.model(student_inputs)
+
+            if teacher_batch is not None: 
+                teacher_full= teacher_batch[0]
+                loss_teacher += self.criterion(teacher_full, student_full)
+                loss_teacher += self.criterion(teacher_full, hidden_full)
+
+
+            #for dim in self.mrl_dims:
+            #    student_dim= F.normalize(student_full[:,:dim], p=2, dim=1)
+            #    loss_student += self.criterion(student_dim, student_inputs)
                 
-                if teacher_batch is not None:
-                    loss_teacher += self.criterion(student_out, teacher_targets)
+                #if teacher_batch is not None:
+                #    teacher_out = F.normalize(teacher_full[:,:dim], p=2, dim=1)
+                #    loss_teacher += self.criterion(student_out, teacher_out)
 
-            loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
-            loss.backward()
+            #loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
+            loss_teacher.backward()
             self.optimizer.step()
-
 
             running_loss += loss_teacher.item()
 
@@ -126,6 +130,8 @@ class Trainer:
         """Run validation using student data and teacher data if provided."""
         self.model.eval()
         running_loss = 0.0
+        
+        print(f"Val {self.teacher_loss_weight}")
 
         if self.teacher_val_loader is not None:
             loader = zip(self.val_loader, self.teacher_val_loader)
@@ -134,26 +140,28 @@ class Trainer:
 
         with torch.no_grad():
             for student_batch, teacher_batch in loader:
-                #student_inputs = student_batch.to(self.device)
                 student_inputs = student_batch[0]
                 loss_student = 0.0
                 loss_teacher = 0.0
 
+                student_full, hidden_full = self.model(student_inputs)
                 if teacher_batch is not None:
-                    #teacher_targets = teacher_batch.to(self.device)
-                    teacher_targets = teacher_batch[0]
+                    teacher_full= teacher_batch[0]
+                    loss_teacher += self.criterion(teacher_full, student_full)
+                    loss_teacher += self.criterion(teacher_full, hidden_full)
                 
-                student_full = self.model(student_inputs)
 
-                for dim in self.mrl_dims:
-                    student_out = F.normalize(student_full[:,:dim], p=2, dim=1)
-                    loss_student += self.criterion(student_out, student_inputs)
+                #for dim in self.mrl_dims:
+                #    student_dim = F.normalize(student_full[:,:dim], p=2, dim=1)
+                #    loss_student += self.criterion(student_dim, student_inputs)
+                    #teacher_dim = F.normalize(teacher_full[:,:dim], p=2, dim=1)
 
-                    if teacher_batch is not None:
-                        loss_teacher += self.criterion(student_out, teacher_targets)
+                    #if teacher_batch is not None:
+                    #    loss_teacher += self.criterion(student_dim, teacher_dim)
 
-                loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
-                running_loss += loss.item()
+                #loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
+                #loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
+                running_loss += loss_teacher.item()
 
         return running_loss / len(self.val_loader)
 
@@ -192,8 +200,8 @@ class Trainer:
             print(f'Val Loss: {val_loss:.6f}')
             
             # Save checkpoints
-            if  val_loss < self.best_val_loss:
-                self.best_val_loss = val_loss
+            #if  val_loss < self.best_val_loss:
+            #    self.best_val_loss = val_loss
             
             self.save_checkpoint(epoch + 1)
 
@@ -225,12 +233,12 @@ def main():
     inDim = model_config["input_dim"]
     outDim = model_config["output_dim"]
 
-    COMPRESSED_DIMENSIONS = [64, 128, 256, 384, 512, outDim]
+    COMPRESSED_DIMENSIONS = [outDim]
 
     model = EncoderOnly(model_config)
     now = datetime.datetime.now().strftime("%H%M%S")
    
-    run_desc = "We use 3 small models here, input dim 1152. Teacher will be used with a coeff of 0.3." 
+    run_desc = "Just distillation" 
     log_line = f"run {now} {inDim} {outDim} {COMPRESSED_DIMENSIONS} Loader batch size {b_size} Obs: first teacher ish thing with normal loss run\n"
 
     with open("logs.txt", "a") as f:
