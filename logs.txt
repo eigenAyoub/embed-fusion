@@ -45,3 +45,14 @@ run 180116 768 1024 [64, 128, 256, 384, 512, 768, 1024] Loader batch size 512 Ob
 run 112138 768 768 [768] Loader batch size 512 Obs: first teacher ish thing with normal loss run
 run 114816 768 768 [768] Loader batch size 256 Obs: first teacher ish thing with normal loss run
 run 123150 768 768 [768] Loader batch size 128 Obs: first teacher ish thing with normal loss run
+run 123734 768 768 [768] Loader batch size 128 Obs: first teacher ish thing with normal loss run
+run 135926 768 768 [768] Loader batch size 128 Obs: first teacher ish thing with normal loss run
+run 160056 768 768 [128, 256, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!
+run 160345 768 768 [128, 256, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!
+run 160627 768 768 [128, 256, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!
+run 160927 768 768 [128, 256, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!
+run 173218 768 768 [32, 64, 128, 200, 256, 300, 350, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl
+run 173412 768 768 [32, 64, 128, 200, 256, 300, 350, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl
+run 173621 768 768 [32, 64, 128, 200, 256, 300, 350, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl
+run 173835 768 768 [32, 64, 128, 200, 256, 300, 350, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl
+run 175148 768 768 [32, 64, 128, 200, 256, 300, 350, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl

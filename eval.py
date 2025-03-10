@@ -6,6 +6,8 @@ from typing import List, Union, Dict, Optional
 from mteb.encoder_interface import Encoder, PromptType
 
 from model import EncoderOnly  
+from LSH import  TheSimpleNet, TheSigNet, TheTanNet
+
 from offline_quant import PerColumnQuantizer  
 
 import torch
@@ -54,6 +56,8 @@ class AdaptiveSentenceTransformer(Encoder):
                  input_dim: Optional[int] = None,
                  compressed_dim: Optional[int] = None,
                  truncate: Optional[int] = None,
+                 use_lsh: Optional[int] = 0
+                 
                  ):
 
         self.device = device
@@ -61,6 +65,7 @@ class AdaptiveSentenceTransformer(Encoder):
         self.tokenizers: List[Union[None, AutoTokenizer]] = []
         self.model_keys: List[str] = []
         self.truncate = truncate
+        self.use_LSH = use_lsh
 
         for model_key in models:
             model_path = self.MODEL_CATALOGUE.get(model_key)
@@ -104,6 +109,15 @@ class AdaptiveSentenceTransformer(Encoder):
             self.quantizer.min_vals = quant_p["min_vals"].to(device)
             self.quantizer.scales = quant_p["scales"].to(device)
             self.quantizer.lut = quant_p["lut"].to(device)
+       
+        if self.use_LSH:
+            print("Oupsie, guess we're here, LSH the fuck")
+            self.LSH = TheSigNet(768, 4096).to(device)
+            self.LST_t = 0.5
+            self.LSH_run_id = 175118
+            self.LSH_epoch  = 10
+            self.LSH_ckpt = f"checks/checkpoint_epoch_{self.LSH_epoch}_{self.LSH_run_id}.pth"
+            self.LSH.load_state_dict(torch.load(self.LSH_ckpt, map_location=device)["model_state_dict"])
 
 
     def _hf_encode(self, model: AutoModel, 
@@ -236,16 +250,27 @@ class AdaptiveSentenceTransformer(Encoder):
 
         concat = torch.cat(embeddings_list, dim=1)
         concat = F.normalize(concat, p=2, dim=1)
-
+        
+        if self.use_LSH: 
+            print(f"The LSH game is on! with fixed threshold {self.LST_t}")
+            concat = self.LSH(concat)
+            print(f"The sig output of lsh is \n{concat}")
+            concat = (concat < self.LST_t).float()
+            print(f"Returninig the threshold {concat}")
+            print(f"Return {concat.shape}")
+            return concat
+        
         if hasattr(self, 'encoder'):
             encoded = self.encoder(concat)
+            print(f"Encoder output shape: {encoded.shape}")
             if self.truncate:
-                print(f"> Encoder + Truncating up to {self.truncate}")
-                return F.normalize(encoded[:,:self.truncate], p=2, dim=1)
+                enc_trunc = F.normalize(encoded[:,:self.truncate], p=2, dim=1)
+                print(f"> Encoder + Truncating up to {self.truncate} of encoded of shape {enc_trunc.shape}")
+                return enc_trunc 
             if hasattr(self, 'quantizer'):
                 return self.quantizer.quantize(encoded)
-            print("> Concat + Encoder (no truncation) > returning:", encoded[0].shape)
-            return encoded[0]
+            print("> Concat + Encoder (no truncation) > returning:", encoded.shape)
+            return encoded
         else:
             print(f"Concat with No encoder {concat.shape}")
             return concat
@@ -262,6 +287,13 @@ def main():
     tsk = sys.argv[2]
 
     # decoder # set to `0 x` if not needed.
+    
+    # mode:  cuz i suck at coding.
+    # 0 nothing, just model itself.
+    # 1 model + encoder, just model itself.b
+    # 2 model + encoder + quantizer, just model itself.b
+    # 3 model + LSH.
+
     use_encoder = bool(int(sys.argv[3])) 
     ckpt = sys.argv[4] if use_encoder else None
 
@@ -315,7 +347,8 @@ def main():
         input_dim=inDim if use_encoder else None,
         compressed_dim=outDim if use_encoder else None,
         truncate=trunc if use_encoder else None,
-        quantizer_path=my_quant if use_quant else None
+        quantizer_path=my_quant if use_quant else None,
+        use_lsh=1
     )
 
     output_folder = f"results/{random_tag}"

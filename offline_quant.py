@@ -34,7 +34,7 @@ class PerColumnQuantizer:
         
         # Compute per-column (feature) min and max.
         self.min_vals = calibration_data.min(dim=0, keepdim=True)[0]  # Shape: (1, D)
-        max_vals = calibration_data.max(dim=0, keepdim=True)[0]         # Shape: (1, D)
+        max_vals      = calibration_data.max(dim=0, keepdim=True)[0]       # Shape: (1, D)
         
         # Compute per-column scales (avoid division by zero).
         self.scales = (max_vals - self.min_vals) / (self.qmax - self.qmin)
@@ -109,15 +109,7 @@ class AdaptiveSentenceTransformer:
         self.quantizer = quantizer
 
     def encode(self, sentences, **kwargs):
-        """
-        Encode sentences into embeddings, then quantize and dequantize them using the
-        pre-computed GPU-friendly quantizer (and its LUT).
-        Args:
-          sentences: A string or list of strings to encode.
-          kwargs: Additional keyword arguments passed to the underlying model.
-        Returns:
-          A floating-point tensor of embeddings (de-quantized) ready for downstream tasks.
-        """
+
         # Get embeddings from the underlying model.
         embeddings = self.model.encode(sentences, **kwargs)
         if not isinstance(embeddings, torch.Tensor):
@@ -133,17 +125,6 @@ class AdaptiveSentenceTransformer:
         deq_embeddings = self.quantizer.dequantize(q_embeddings)
         return deq_embeddings
 
-# ==============================================================================
-# Dummy Model and Example Usage
-# ==============================================================================
-
-class DummyModel:
-    """A dummy model that simulates an encode() method returning random embeddings."""
-    def encode(self, sentences, **kwargs):
-        if isinstance(sentences, str):
-            sentences = [sentences]
-        # For example, return random embeddings with dimension 1024.
-        return torch.randn(len(sentences), 1024)
 
 if __name__ == "__main__":
     # -------------------------------

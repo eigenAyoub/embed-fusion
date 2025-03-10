@@ -14,7 +14,7 @@ from config import BATCH_SIZE as b_size
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-NUM_EPOCHS = 30
+NUM_EPOCHS = 50
 LEARNING_RATE = 1e-3
 WEIGHT_DECAY  = 1e-4
 STEP_SIZE = 10
@@ -87,9 +87,6 @@ class Trainer:
         self.model.train()
         running_loss = 0.0
 
-        self.teacher_loss_weight = 0.7
-        print(f"Epoch {epoch}, Teacher coeff {self.teacher_loss_weight}")
-
         if self.teacher_train_loader is not None:
             loader = zip(self.train_loader, self.teacher_train_loader)
         else:
@@ -102,27 +99,33 @@ class Trainer:
             loss_student = 0.0
             loss_teacher = 0.0
 
-            student_full, hidden_full = self.model(student_inputs)
+            student_full = self.model(student_inputs)
 
             if teacher_batch is not None: 
+                print("Oupsie!")
                 teacher_full= teacher_batch[0]
                 loss_teacher += self.criterion(teacher_full, student_full)
-                loss_teacher += self.criterion(teacher_full, hidden_full)
+                #loss_teacher += self.criterion(teacher_full, hidden_full)
 
-
-            #for dim in self.mrl_dims:
-            #    student_dim= F.normalize(student_full[:,:dim], p=2, dim=1)
-            #    loss_student += self.criterion(student_dim, student_inputs)
+            for dim in self.mrl_dims:
+                student_dim= F.normalize(student_full[:,:dim], p=2, dim=1)
+                loss_student += self.criterion(student_dim, student_inputs)
                 
-                #if teacher_batch is not None:
-                #    teacher_out = F.normalize(teacher_full[:,:dim], p=2, dim=1)
-                #    loss_teacher += self.criterion(student_out, teacher_out)
+                if teacher_batch is not None:
+                    print("Oupsie")
+                    teacher_out = F.normalize(teacher_full[:,:dim], p=2, dim=1)
+                    loss_teacher += self.criterion(student_dim, teacher_out)
 
-            #loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
-            loss_teacher.backward()
-            self.optimizer.step()
+            if self.teacher_train_loader is not None:
+                loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
+                loss.backward()
+                self.optimizer.step()
+                running_loss += loss.item()
+            else:
+                loss_student.backward()
+                self.optimizer.step()
+                running_loss += loss_student.item()
 
-            running_loss += loss_teacher.item()
 
         return running_loss / len(self.train_loader)
 
@@ -144,24 +147,25 @@ class Trainer:
                 loss_student = 0.0
                 loss_teacher = 0.0
 
-                student_full, hidden_full = self.model(student_inputs)
+                #student_full, hidden_full = self.model(student_inputs)
+                student_full = self.model(student_inputs)
+
                 if teacher_batch is not None:
                     teacher_full= teacher_batch[0]
                     loss_teacher += self.criterion(teacher_full, student_full)
-                    loss_teacher += self.criterion(teacher_full, hidden_full)
+                    #loss_teacher += self.criterion(teacher_full, hidden_full)
                 
 
-                #for dim in self.mrl_dims:
-                #    student_dim = F.normalize(student_full[:,:dim], p=2, dim=1)
-                #    loss_student += self.criterion(student_dim, student_inputs)
-                    #teacher_dim = F.normalize(teacher_full[:,:dim], p=2, dim=1)
+                for dim in self.mrl_dims:
+                    student_dim = F.normalize(student_full[:,:dim], p=2, dim=1)
+                    loss_student += self.criterion(student_dim, student_inputs)
 
-                    #if teacher_batch is not None:
-                    #    loss_teacher += self.criterion(student_dim, teacher_dim)
+                    if teacher_batch is not None:
+                        print("Oupsie!")
+                        teacher_dim = F.normalize(teacher_full[:,:dim], p=2, dim=1)
+                        loss_teacher += self.criterion(student_dim, teacher_dim)
 
-                #loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
-                #loss = (1-self.teacher_loss_weight)*loss_student + self.teacher_loss_weight*loss_teacher
-                running_loss += loss_teacher.item()
+                running_loss += loss_student.item()
 
         return running_loss / len(self.val_loader)
 
@@ -222,8 +226,8 @@ def main():
     val_loader   = get_data_to_gpu(student_val_path)
     train_loader = get_data_to_gpu(student_train_path)
 
-    teacher_val_loader = get_data_to_gpu(teacher_val_path)
-    teacher_train_loader = get_data_to_gpu(teacher_train_path)
+    teacher_val_loader = None #get_data_to_gpu(teacher_val_path)
+    teacher_train_loader = None #get_data_to_gpu(teacher_train_path)
 
     model_config = {
                     'input_dim':  768,
@@ -233,13 +237,13 @@ def main():
     inDim = model_config["input_dim"]
     outDim = model_config["output_dim"]
 
-    COMPRESSED_DIMENSIONS = [outDim]
+    COMPRESSED_DIMENSIONS = [32, 64, 128, 200, 256, 300, 350, 384, 512, outDim]
 
     model = EncoderOnly(model_config)
     now = datetime.datetime.now().strftime("%H%M%S")
    
-    run_desc = "Just distillation" 
-    log_line = f"run {now} {inDim} {outDim} {COMPRESSED_DIMENSIONS} Loader batch size {b_size} Obs: first teacher ish thing with normal loss run\n"
+    run_desc = "Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl" 
+    log_line = f"run {now} {inDim} {outDim} {COMPRESSED_DIMENSIONS} batch -size {b_size} {run_desc}\n"
 
     with open("logs.txt", "a") as f:
         f.write(log_line)

@@ -62,7 +62,7 @@ def get_data(path):
     train_loader = DataLoader(
         train_dataset, 
         batch_size=BATCH_SIZE, 
-        #shuffle=True, 
+        shuffle=True, 
         num_workers=NUM_WORKERS,
     )
     
@@ -76,7 +76,10 @@ def get_data_to_gpu(path):
     tensor_data = torch.tensor(data).to("cuda")
     dataset = torch.utils.data.TensorDataset(tensor_data)
     
-    loader = DataLoader(dataset, batch_size=BATCH_SIZE, num_workers=0)
+    loader = DataLoader(dataset, 
+                        batch_size=BATCH_SIZE, 
+                        #shuffle=True,
+                        num_workers=0)
     
     print(f"Loaded data to GPU: {tensor_data.shape}")
     return loader

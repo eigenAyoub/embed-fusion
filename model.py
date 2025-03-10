@@ -33,5 +33,5 @@ class EncoderOnly(nn.Module):
         hidden = self.hidden_layer(x_norm)
         #output = self.output_layer(hidden) + x_norm
         output = self.output_layer(hidden) 
-        return output, hidden
+        return output #, hidden
 
