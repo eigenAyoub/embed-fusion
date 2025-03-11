@@ -11,15 +11,27 @@ model_base="$1"
 run_base="$2"
 tag_name="$3"
 
+for ep in {1..49}; do
+    
+    if [[ $ep -lt 10 ]]
+    then
+        ep="0${ep}"
+        echo "> Executing eval.py with checkpoint > $2_ep_0${ep}_$3"
+    fi
 
+    python eval.py "$1" NFCorpus 1 "$2_ep_0${ep}_$3" 0 0 x "$3-$ep-x"   
+    python eval.py "$1" SciFact  1 "$2_ep_0${ep}_$3" 0 0 x "$3-$ep-x"   
+    #python eval.py "$1" ArguAna  1 "$2_ep_0${ep}_$3" 0 0 x "$3-$ep"   
+    #python eval.py "$1" SCIDOCS  1 "$2_ep_0${ep}_$3" 0 0 x "$3-$ep"   
 
-for ep in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 26 27 28 30; do
+    #python eval.py "$1" NFCorpus 1 "$2_ep_0${ep}_$3" 512 0 x "$3-$ep-512"   
+    #python eval.py "$1" SciFact  1 "$2_ep_0${ep}_$3" 512 0 x "$3-$ep-512"   
+    #python eval.py "$1" ArguAna  1 "$2_ep_0${ep}_$3" 512 0 x "$3-$ep-512"   
+    #python eval.py "$1" SCIDOCS  1 "$2_ep_0${ep}_$3" 512 0 x "$3-$ep-512"   
 
-    echo "> Executing eval.py with checkpoint > $2_ep_0${ep}_$3"
-
-    python eval.py "$1" NFCorpus 1 "$2_ep_0${ep}_$3" 0 0 x "$3-$ep"   
-    python eval.py "$1" SciFact  1 "$2_ep_0${ep}_$3" 0 0 x "$3-$ep"   
-    python eval.py "$1" ArguAna  1 "$2_ep_0${ep}_$3" 0 0 x "$3-$ep"   
-
+    #python eval.py "$1" NFCorpus 1 "$2_ep_0${ep}_$3" 384 0 x "$3-$ep-384-x"   
+    #python eval.py "$1" SciFact  1 "$2_ep_0${ep}_$3" 384 0 x "$3-$ep-384-x"   
+    #python eval.py "$1" ArguAna  1 "$2_ep_0${ep}_$3" 384 0 x "$3-$ep-384"   
+    #python eval.py "$1" SCIDOCS  1 "$2_ep_0${ep}_$3" 384 0 x "$3-$ep-384"   
 done
 

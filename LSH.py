@@ -69,7 +69,7 @@ def train_epoch(model, dataloader, criterion, optimizer, device, epoch):
             collected_outputs.append(outputs.detach().cpu()) 
 
         #loss = criterion(outputs, student_inputs) + 0.01*sigLoss(outputs) + 0.05*bitBalance(outputs)
-        loss = criterion(outputs, student_inputs) + 0.05*bitBalance(outputs)
+        loss = criterion(outputs, student_inputs) + 0.1*bitBalance(outputs)
 
         loss.backward()
         optimizer.step()
@@ -89,7 +89,7 @@ def validate_epoch(model, dataloader, criterion, device):
         for batch in dataloader:
             student_inputs = batch[0]
             outputs = model(student_inputs)
-            loss = criterion(outputs, student_inputs) + 0.05*bitBalance(outputs)
+            loss = criterion(outputs, student_inputs) + 0.1*bitBalance(outputs)
             running_loss += loss.item() * student_inputs.size(0)
     epoch_loss = running_loss / len(dataloader.dataset)
     return epoch_loss
@@ -120,8 +120,8 @@ def main():
     input_dim = 768
     embedding_dim = 4096
 
-    num_epochs = 30
-    learning_rate = 1e-3
+    num_epochs = 40
+    learning_rate = 4e-4
 
     device = "cuda" 
     

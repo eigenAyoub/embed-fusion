@@ -231,13 +231,13 @@ def main():
 
     model_config = {
                     'input_dim':  768,
-                    'output_dim': 768,
+                    'output_dim': 512,
                 }
 
     inDim = model_config["input_dim"]
     outDim = model_config["output_dim"]
 
-    COMPRESSED_DIMENSIONS = [32, 64, 128, 200, 256, 300, 350, 384, 512, outDim]
+    COMPRESSED_DIMENSIONS = [32, 64, 128, 200, 256, 300, 350, 384, 512]
 
     model = EncoderOnly(model_config)
     now = datetime.datetime.now().strftime("%H%M%S")

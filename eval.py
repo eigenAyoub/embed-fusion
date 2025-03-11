@@ -56,7 +56,8 @@ class AdaptiveSentenceTransformer(Encoder):
                  input_dim: Optional[int] = None,
                  compressed_dim: Optional[int] = None,
                  truncate: Optional[int] = None,
-                 use_lsh: Optional[int] = 0
+                 use_lsh: Optional[int] = 0,
+                 lsh_info: Optional[tuple] = [None, None]
                  
                  ):
 
@@ -114,8 +115,8 @@ class AdaptiveSentenceTransformer(Encoder):
             print("Oupsie, guess we're here, LSH the fuck")
             self.LSH = TheSigNet(768, 4096).to(device)
             self.LST_t = 0.5
-            self.LSH_run_id = 175118
-            self.LSH_epoch  = 10
+            self.LSH_epoch  = lsh_info[0]
+            self.LSH_run_id = lsh_info[1] 
             self.LSH_ckpt = f"checks/checkpoint_epoch_{self.LSH_epoch}_{self.LSH_run_id}.pth"
             self.LSH.load_state_dict(torch.load(self.LSH_ckpt, map_location=device)["model_state_dict"])
 
@@ -306,9 +307,18 @@ def main():
 
     # name tage for resutls
     random_tag = sys.argv[8]
+   
+    use_lsh = 0 
+    if len(sys.argv) > 9:
+        use_lsh = 1
+        lsh_epoch = sys.argv[9]
+        lsh_ckpt  = sys.argv[10]
+        print(f"Using lsh with run-Id {lsh_ckpt}, and epoch {lsh_epoch}.")
+        # please no more of this fucking interface.
     
     print(f"Encoder ? {use_encoder}")
     print(f"Quant? {use_quant}")
+    print(f"LSH? {use_lsh}")
 
     inDim, outDim = 0, 0
 
@@ -348,7 +358,8 @@ def main():
         compressed_dim=outDim if use_encoder else None,
         truncate=trunc if use_encoder else None,
         quantizer_path=my_quant if use_quant else None,
-        use_lsh=1
+        use_lsh=use_lsh,
+        lsh_info = [lsh_epoch,lsh_ckpt] if use_lsh else None
     )
 
     output_folder = f"results/{random_tag}"

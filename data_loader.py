@@ -78,7 +78,7 @@ def get_data_to_gpu(path):
     
     loader = DataLoader(dataset, 
                         batch_size=BATCH_SIZE, 
-                        #shuffle=True,
+                        shuffle=True,
                         num_workers=0)
     
     print(f"Loaded data to GPU: {tensor_data.shape}")
