@@ -14,8 +14,8 @@ from config import BATCH_SIZE as b_size
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-NUM_EPOCHS = 50
-LEARNING_RATE = 1e-3
+NUM_EPOCHS = 15 #50
+LEARNING_RATE = 4e-4 #1e-3
 WEIGHT_DECAY  = 1e-4
 STEP_SIZE = 10
 GAMMA = 0.8
@@ -240,7 +240,12 @@ def main():
     COMPRESSED_DIMENSIONS = [32, 64, 128, 200, 256, 300, 350, 384, 512]
 
     model = EncoderOnly(model_config)
+    check = "models_pth/768_512/768_512_ep_050_230400.pth"
+    model.load_state_dict(torch.load(check, map_location="cuda")["model_state_dict"])
     now = datetime.datetime.now().strftime("%H%M%S")
+
+    
+    
    
     run_desc = "Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl" 
     log_line = f"run {now} {inDim} {outDim} {COMPRESSED_DIMENSIONS} batch -size {b_size} {run_desc}\n"

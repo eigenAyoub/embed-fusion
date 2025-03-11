@@ -57,3 +57,5 @@ run 173621 768 768 [32, 64, 128, 200, 256, 300, 350, 384, 512, 768] batch -size 
 run 173835 768 768 [32, 64, 128, 200, 256, 300, 350, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl
 run 175148 768 768 [32, 64, 128, 200, 256, 300, 350, 384, 512, 768] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl
 run 230400 768 512 [32, 64, 128, 200, 256, 300, 350, 384, 512] batch -size 124 Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl
+run 113859 768 512 [32, 64, 128, 200, 256, 300, 350, 384, 512] batch -size 256 Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl
+run 115833 768 512 [32, 64, 128, 200, 256, 300, 350, 384, 512] batch -size 128 Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl

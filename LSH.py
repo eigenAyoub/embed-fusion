@@ -26,6 +26,31 @@ class TheSimpleNet(nn.Module):
         z = self.fc(x)
         binary = (z > 0).float() 
         return binary
+    
+    def encode(self, x):
+        return self.fc(x)
+    
+## To simply generate a (hopefully better threshold):
+## For the combined-s:
+
+import numpy as np
+
+tag = "no-ins-gte-small"
+student_val_path = f"generate_data/{tag}/val_embeddings.npy"
+val_ds = np.load(student_val_path)
+val_ds = torch.tensor(val_ds) # please switch all to torch.
+
+m = TheSimpleNet(768, 4096)
+m.load_state_dict(torch.load("chillDude.pth"))
+
+acts = m.encode(val_ds)  
+
+thresholds = acts.median(dim=0)
+
+
+
+    
+    
 
 class TheSigNet(nn.Module):
     def __init__(self, input_dim=768, embedding_dim=4096):

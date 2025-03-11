@@ -83,7 +83,12 @@ class AdaptiveSentenceTransformer(Encoder):
                 model = AutoModel.from_pretrained(model_path).to(device)
                 #MODEL_CACHE[model_path] = (model, tokenizer)
             else:
-                model = SentenceTransformer(model_path, trust_remote_code=True).to(device)
+                if model_key == "mxbai":
+                    ddd = 512
+                    print(f"We truncating {model_key} to {ddd} dimensions")
+                    model = SentenceTransformer(model_path, trust_remote_code=True, truncate_dim=ddd).to(device)
+                else:
+                    model = SentenceTransformer(model_path, trust_remote_code=True).to(device)
                 tokenizer = None
                 if model_key == "infly":
                     model.max_seq_length = 512 
@@ -113,12 +118,15 @@ class AdaptiveSentenceTransformer(Encoder):
        
         if self.use_LSH:
             print("Oupsie, guess we're here, LSH the fuck")
-            self.LSH = TheSigNet(768, 4096).to(device)
-            self.LST_t = 0.5
+            #self.LSH = TheSigNet(768, 4096).to(device)
+            self.LST_t = torch.load("thresh.pth", map_location=device)
+            print(f"here is the goat threash {self.LST_t}")
             self.LSH_epoch  = lsh_info[0]
             self.LSH_run_id = lsh_info[1] 
-            self.LSH_ckpt = f"checks/checkpoint_epoch_{self.LSH_epoch}_{self.LSH_run_id}.pth"
-            self.LSH.load_state_dict(torch.load(self.LSH_ckpt, map_location=device)["model_state_dict"])
+            #self.LSH_ckpt = f"checks/checkpoint_epoch_{self.LSH_epoch}_{self.LSH_run_id}.pth"
+            self.LSH = TheSimpleNet(768, 4096).to(device)
+            self.LSH_ckpt = f"chillDude.pth"
+            self.LSH.load_state_dict(torch.load(self.LSH_ckpt, map_location=device))
 
 
     def _hf_encode(self, model: AutoModel, 
@@ -247,18 +255,23 @@ class AdaptiveSentenceTransformer(Encoder):
                     print(f"> Truncating up to {self.truncate}")
                     return F.normalize(encoded[:,:self.truncate], p=2, dim=1)
                 return encoded
-            return embeddings_list[0]
+            embeddings = embeddings_list[0]
+            print(f"This is a single model, with no encoder, returned shape {embeddings.shape}")
+            return embeddings 
 
         concat = torch.cat(embeddings_list, dim=1)
         concat = F.normalize(concat, p=2, dim=1)
         
         if self.use_LSH: 
             print(f"The LSH game is on! with fixed threshold {self.LST_t}")
-            concat = self.LSH(concat)
-            print(f"The sig output of lsh is \n{concat}")
-            concat = (concat < self.LST_t).float()
-            print(f"Returninig the threshold {concat}")
-            print(f"Return {concat.shape}")
+            activations = self.LSH.encode(concat)
+            what = (activations < self.LST_t).float()
+            print(f"Returninig the activations {activations}")
+            print(f"After applying {what}, shape {what.shape}")
+            return what
+            #concat = self.LSH(concat)
+            #print(f"The sig output of lsh is \n{concat}")
+            #concat = (concat < self.LST_t).float()
             return concat
         
         if hasattr(self, 'encoder'):

@@ -18,11 +18,10 @@ if [ "$#" -ne 2 ]; then
     usage
 fi
 
-# Assign arguments to variables
 TASK_NAME="$1"
 INSERT_NAME_BASE="$2"
 
-epochs=(01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30)
+
 
 # Define a function to extract the desired metric using jq
 extract_metric() {
@@ -56,9 +55,15 @@ echo "Extracting ndcg_at_10 for task: ${TASK_NAME}"
 echo "Insert Name Base: ${INSERT_NAME_BASE}"
 echo "--------------------------------------------"
 
-for ep in "${epochs[@]}"; do
+for ep in {1..15}; do
     # Construct the insert-name-here argument based on the current epoch
-    insert_name="${INSERT_NAME_BASE}-${ep}"
+
+    insert_name="${INSERT_NAME_BASE}-0${ep}"
+
+    if [[ $ep -ge 10 ]]; then
+        insert_name="${INSERT_NAME_BASE}-${ep}"
+    fi
+
 
     # Extract the ndcg_at_10 metric
     score=$(extract_metric "$insert_name" "$TASK_NAME" "ndcg_at_10")
