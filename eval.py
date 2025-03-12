@@ -84,9 +84,7 @@ class AdaptiveSentenceTransformer(Encoder):
                 #MODEL_CACHE[model_path] = (model, tokenizer)
             else:
                 if model_key == "mxbai":
-                    ddd = 512
-                    print(f"We truncating {model_key} to {ddd} dimensions")
-                    model = SentenceTransformer(model_path, trust_remote_code=True, truncate_dim=ddd).to(device)
+                    model = SentenceTransformer(model_path, trust_remote_code=True).to(device)
                 else:
                     model = SentenceTransformer(model_path, trust_remote_code=True).to(device)
                 tokenizer = None
@@ -196,6 +194,7 @@ class AdaptiveSentenceTransformer(Encoder):
         embeddings_list = []
 
         for model, tokenizer, model_key in zip(self.models, self.tokenizers, self.model_keys):
+            print(f"Turn for {model_key}!")
             model_batches = []
             for start in tqdm(range(0, len(sentences), batch_size), desc=f"Processing {model_key} batches", leave=False):
                 batch = sentences[start:start + batch_size]
@@ -350,13 +349,17 @@ def main():
 
     if model_type == "combined-s":
         model_keys = ["no-ins", "gte-small"]
+    elif model_type == "fancy":
+        #model_keys = ["snowflake-m", "no-ins"]
+        model_keys = ["mxbai", "snowflake-m"]
     elif model_type == "combined-l":
         #model_keys = ["e5", "mxbai"]
         model_keys =  ["mxbai", "no-ins"]
     elif model_type == "three-33M":
         model_keys = ["e5-small", "no-ins", "gte-small"]
     elif model_type == "all-4":
-        model_keys = ["bge-small", "e5-small", "gist", "snowflake-m"]
+        #model_keys = ["snowflake-m", "no-ins", "gte-small", "e5-small"]
+        model_keys = ["snowflake-m", "bge-small", "e5-small", "gist"]
     else:
         model_keys = [model_type]  # Single model
 

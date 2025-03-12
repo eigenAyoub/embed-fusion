@@ -30,6 +30,11 @@ class TheSimpleNet(nn.Module):
     def encode(self, x):
         return self.fc(x)
     
+
+
+"""
+Move this somewhere:
+
 ## To simply generate a (hopefully better threshold):
 ## For the combined-s:
 
@@ -46,6 +51,9 @@ m.load_state_dict(torch.load("chillDude.pth"))
 acts = m.encode(val_ds)  
 
 thresholds = acts.median(dim=0)
+
+encoded = (acts < thresholds).float()
+"""
 
 
 
