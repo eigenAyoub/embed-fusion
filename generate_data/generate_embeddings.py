@@ -17,8 +17,8 @@ model_key = sys.argv[1]
 split_dir = "split_indices"
 wiki_path = os.path.join(split_dir, "all_paragraphs.pkl")
 
-train_indices = torch.from_numpy(np.load(os.path.join(split_dir, "train_indices.npy")))
-val_indices   = torch.from_numpy(np.load(os.path.join(split_dir, "val_indices.npy")))
+train_indices = torch.from_numpy(np.load(os.path.join(split_dir, "train_indices.npy"))).to("cuda")
+val_indices   = torch.from_numpy(np.load(os.path.join(split_dir, "val_indices.npy"))).to("cuda")
 
 import pickle
 with open(wiki_path, 'rb') as f:
@@ -26,6 +26,7 @@ with open(wiki_path, 'rb') as f:
 
 
 num_samples = len(all_paragraphs)
+
 print(f"Train set size: {len(train_indices)}")
 print(f"Validation set size: {len(val_indices)}")
 print(f"Total passages loaded: {num_samples}")
@@ -62,13 +63,14 @@ for i in tqdm(range(num_batches), desc="Generating Embeddings"):
 embeddings = torch.cat(embeddings, dim=0) 
 
 
+save_dir = f"embeddings_data/{model_key}"
+os.makedirs(save_dir, exist_ok=True)
+
 print(f"Returned Embeddings shape: {embeddings.shape}")
+torch.save(embeddings, os.path.join(save_dir, "all.pth") )
 
 train_data = embeddings[train_indices]
 val_data   = embeddings[val_indices]
-
-save_dir = f"embeddings_data/{model_key}"
-os.makedirs(save_dir, exist_ok=True)
 
 torch.save(train_data, os.path.join(save_dir, "train_embeddings.pth") )
 torch.save(val_data, os.path.join(save_dir, "val_embeddings.pth"))

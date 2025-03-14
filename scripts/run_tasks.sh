@@ -10,6 +10,6 @@ model_name="$1"
 tag_name="$2"
 
 for task in NFCorpus SciFact ArguAna SCIDOCS QuoraRetrieval; do
-    python eval.py "$1" "$task" 0 x 0 0 x  "$2" 
+    python eval.py "$1" "$task" 0 x 384 0 x  "$2" 
 done
 

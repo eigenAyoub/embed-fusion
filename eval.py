@@ -5,7 +5,7 @@ from typing import List, Union, Dict, Optional
 
 from mteb.encoder_interface import Encoder, PromptType
 
-from model import EncoderOnly  
+from model import EncoderOnly, SimpleEncoder
 from LSH import  TheSimpleNet, TheSigNet, TheTanNet
 
 from offline_quant import PerColumnQuantizer  
@@ -101,7 +101,12 @@ class AdaptiveSentenceTransformer(Encoder):
 
         if checkpoint_path and input_dim and compressed_dim:
             model_config = {"input_dim": input_dim, "output_dim": compressed_dim}
-            self.encoder = EncoderOnly(model_config).to(device)
+            if "4096" in checkpoint_path:
+                self.encoder = SimpleEncoder(model_config).to(device)
+                print(f"Went for Simple")
+            else:
+                self.encoder = EncoderOnly(model_config).to(device)
+                print(f"Went for EncoderOnly")
             self.encoder.load_state_dict(torch.load(checkpoint_path)["model_state_dict"])
             self.encoder.eval()
         else:
@@ -115,7 +120,7 @@ class AdaptiveSentenceTransformer(Encoder):
             self.quantizer.lut = quant_p["lut"].to(device)
        
         if self.use_LSH:
-            print("Oupsie, guess we're here, LSH the fuck")
+            print("Oupsie, LSH")
             #self.LSH = TheSigNet(768, 4096).to(device)
             self.LST_t = torch.load("thresh.pth", map_location=device)
             print(f"here is the goat threash {self.LST_t}")
@@ -247,15 +252,19 @@ class AdaptiveSentenceTransformer(Encoder):
 
         # If only one model is used, optionally pass through the encoder.
         if self.single_model:
+            embeddings = embeddings_list[0]  # I hate you so much!!
+
             if hasattr(self, 'encoder'):
-                print("> Decoder in")
-                encoded = self.encoder(embeddings_list[0])
-                if self.truncate:
-                    print(f"> Truncating up to {self.truncate}")
-                    return F.normalize(encoded[:,:self.truncate], p=2, dim=1)
-                return encoded
-            embeddings = embeddings_list[0]
-            print(f"This is a single model, with no encoder, returned shape {embeddings.shape}")
+                embeddings = self.encoder(embeddings)
+                print(f"> Decoder in for single model, return shape {embeddings.shape}")
+
+            if self.truncate:
+                truncated = F.normalize(embeddings[:,:self.truncate], p=2, dim=1)
+                print(f"> Truncating up to {self.truncate}, return shape {embeddings.shape}")
+                return truncated 
+
+            print(f"Retrurning {embeddings.shape}; No encoder, and No truncation")
+
             return embeddings 
 
         concat = torch.cat(embeddings_list, dim=1)
@@ -311,7 +320,7 @@ def main():
     ckpt = sys.argv[4] if use_encoder else None
 
     # trunc
-    trunc = int(sys.argv[5])   # no far it is only accounted if the encoder is in.
+    trunc = int(sys.argv[5])   # so far it is only accounted if the encoder is in.
 
     # quant
     use_quant = bool(int(sys.argv[6]))
@@ -349,17 +358,16 @@ def main():
 
     if model_type == "combined-s":
         model_keys = ["no-ins", "gte-small"]
-    elif model_type == "fancy":
-        #model_keys = ["snowflake-m", "no-ins"]
+    elif model_type == "custom":
         model_keys = ["mxbai", "snowflake-m"]
+    elif model_type == "all-stars":
+        model_keys = ["snowflake-m", "no-ins", "gte-small", "e5-small"] 
+    elif model_type == "all-stars":
+        model_keys = ["no-ins", "gte-small", "e5-small", "bge-small"] 
     elif model_type == "combined-l":
-        #model_keys = ["e5", "mxbai"]
-        model_keys =  ["mxbai", "no-ins"]
+        model_keys = ["e5", "mxbai"]
     elif model_type == "three-33M":
         model_keys = ["e5-small", "no-ins", "gte-small"]
-    elif model_type == "all-4":
-        #model_keys = ["snowflake-m", "no-ins", "gte-small", "e5-small"]
-        model_keys = ["snowflake-m", "bge-small", "e5-small", "gist"]
     else:
         model_keys = [model_type]  # Single model
 
@@ -372,7 +380,7 @@ def main():
         checkpoint_path=f"models_pth/{inDim}_{outDim}/{ckpt}.pth" if use_encoder else None,
         input_dim=inDim if use_encoder else None,
         compressed_dim=outDim if use_encoder else None,
-        truncate=trunc if use_encoder else None,
+        truncate=trunc if trunc != 0 else None,
         quantizer_path=my_quant if use_quant else None,
         use_lsh=use_lsh,
         lsh_info = [lsh_epoch,lsh_ckpt] if use_lsh else None

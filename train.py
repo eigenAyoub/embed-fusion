@@ -9,13 +9,15 @@ from torch.utils.data import DataLoader
 
 from data_loader import get_data, get_data_to_gpu
 from loss import SimilarityLoss, Similarity, KLSimilarityLoss, InfoNCELoss 
-from model import EncoderOnly 
+
+from model import EncoderOnly, SimpleEncoder
+
 from config import BATCH_SIZE as b_size
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-NUM_EPOCHS = 15 #50
-LEARNING_RATE = 4e-4 #1e-3
+NUM_EPOCHS = 50
+LEARNING_RATE =  1e-3
 WEIGHT_DECAY  = 1e-4
 STEP_SIZE = 10
 GAMMA = 0.8
@@ -216,9 +218,9 @@ class Trainer:
 
 def main():
   
-    tag = "no-ins-gte-small"
-    student_train_path = f"generate_data/{tag}/train_embeddings.npy"
-    student_val_path = f"generate_data/{tag}/val_embeddings.npy"
+    tag = "combined-s" 
+    student_train_path = f"generate_data/{tag}/train_embeddings.pth"
+    student_val_path = f"generate_data/{tag}/val_embeddings.pth"
 
     teacher_train_path = "generate_data/embeddings_data/f_mxbai_wiki_500k/train_embeddings.npy"
     teacher_val_path   = "generate_data/embeddings_data/f_mxbai_wiki_500k/val_embeddings.npy"
@@ -231,20 +233,20 @@ def main():
 
     model_config = {
                     'input_dim':  768,
-                    'output_dim': 512,
+                    'output_dim': 4096,
                 }
 
     inDim = model_config["input_dim"]
     outDim = model_config["output_dim"]
 
-    COMPRESSED_DIMENSIONS = [32, 64, 128, 200, 256, 300, 350, 384, 512]
+    #COMPRESSED_DIMENSIONS = [32, 64, 128, 200, 256, 300, 350, 384, 512, 768]
+    COMPRESSED_DIMENSIONS = [512, 768, 1024, 2048, outDim]
+    print(f"MRL dims: {COMPRESSED_DIMENSIONS}")
 
-    model = EncoderOnly(model_config)
-    check = "models_pth/768_512/768_512_ep_050_230400.pth"
-    model.load_state_dict(torch.load(check, map_location="cuda")["model_state_dict"])
+    model = SimpleEncoder(model_config)
+    #check = "models_pth/768_512/768_512_ep_050_230400.pth"
+    #model.load_state_dict(torch.load(check, map_location="cuda")["model_state_dict"])
     now = datetime.datetime.now().strftime("%H%M%S")
-
-    
     
    
     run_desc = "Run desc: Back to 2-models. MRL baseline, then quant!, very high mrl" 

@@ -72,8 +72,7 @@ def get_data(path):
 
 def get_data_to_gpu(path):
 
-    data = np.load(path)
-    tensor_data = torch.tensor(data).to("cuda")
+    tensor_data = torch.load(path, map_location="cuda")
     dataset = torch.utils.data.TensorDataset(tensor_data)
     
     loader = DataLoader(dataset, 
